@@ -1,25 +1,20 @@
 #!/usr/bin/env bash
-# HTTPS для сайта: сертификат через acme.sh (сначала Let's Encrypt, при сбое — ZeroSSL)
-# и конфиг nginx. Безопасно запускать повторно: если сертификат уже есть, только обновит конфиг.
-#   bash https.sh          — получить сертификат (если его ещё нет) и настроить nginx
-#   bash https.sh nginx    — только переписать конфиг nginx по текущему состоянию
-# Почта для ZeroSSL передаётся один раз через EMAIL=... и хранится только на сервере (/etc/novosti-max/email).
+# HTTPS для сайта. С сервера в России Let's Encrypt недоступен, поэтому сертификат выпускает
+# GitHub Actions (.github/workflows/cert.yml), а сервер:
+#   1) держит у себя секретный ключ и публикует только запрос на сертификат (CSR) — он не секретный;
+#   2) раздаёт проверочные файлы Let's Encrypt из certs/challenges/ репозитория;
+#   3) ставит готовый сертификат из certs/fullchain.pem, если он подходит к его ключу.
+# Запускается при каждой синхронизации (deploy/sync.sh). `bash https.sh nginx` — только переписать конфиг.
 set -uo pipefail
 
 DOMAIN="${DOMAIN:-novosti-max.com}"
 DIR=/opt/novosti-max
 SSL=/etc/ssl/novosti-max
-CONF=/etc/novosti-max
-ACME_WEBROOT=/var/www/acme
-ACME_HOME=/root/.acme.sh
-ACME="$ACME_HOME/acme.sh"
+WEBROOT=/var/www/acme
+CHAL="$WEBROOT/.well-known/acme-challenge"
 
-mkdir -p "$SSL" "$CONF" "$ACME_WEBROOT"
-if [ -n "${EMAIL:-}" ]; then
-  echo "$EMAIL" > "$CONF/email"; chmod 600 "$CONF/email"
-fi
-EMAIL="$(cat "$CONF/email" 2>/dev/null || true)"
-EMAIL="${EMAIL:-admin@$DOMAIN}"   # служебный адрес для регистрации в ZeroSSL
+mkdir -p "$SSL" "$CHAL"
+chmod 700 "$SSL"
 
 have_cert() { [ -s "$SSL/fullchain.pem" ] && [ -s "$SSL/key.pem" ]; }
 
@@ -35,10 +30,11 @@ write_nginx() {
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml text/xml application/xml;
     add_header X-Content-Type-Options nosniff;"
-  local acme="location ^~ /.well-known/acme-challenge/ { root $ACME_WEBROOT; default_type text/plain; }"
+  local acme="location ^~ /.well-known/acme-challenge/ { root $WEBROOT; default_type text/plain; }"
+  local new=/etc/nginx/sites-available/novosti-max.new
 
   if have_cert; then
-    cat > /etc/nginx/sites-available/novosti-max <<NGINX
+    cat > "$new" <<NGINX
 server {
     listen 80;
     listen [::]:80;
@@ -60,7 +56,7 @@ server {
 }
 NGINX
   else
-    cat > /etc/nginx/sites-available/novosti-max <<NGINX
+    cat > "$new" <<NGINX
 server {
     listen 80;
     listen [::]:80;
@@ -70,48 +66,46 @@ server {
 }
 NGINX
   fi
-  ln -sf /etc/nginx/sites-available/novosti-max /etc/nginx/sites-enabled/novosti-max
-  rm -f /etc/nginx/sites-enabled/default
-  nginx -t -q && systemctl reload nginx
+  # перезагружаем nginx, только если конфиг изменился
+  if ! cmp -s "$new" /etc/nginx/sites-available/novosti-max; then
+    mv "$new" /etc/nginx/sites-available/novosti-max
+    ln -sf /etc/nginx/sites-available/novosti-max /etc/nginx/sites-enabled/novosti-max
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t -q && systemctl reload nginx && echo "$(date '+%F %T') nginx: конфиг обновлён ($(have_cert && echo https || echo http))"
+  else
+    rm -f "$new"
+  fi
 }
 
 if [ "${1:-}" = "nginx" ]; then write_nginx; exit 0; fi
 
-# сертификат уже есть — просто убедиться, что конфиг правильный
-if have_cert; then write_nginx; exit 0; fi
+# 1. ключ и запрос на сертификат (ключ создаётся один раз и никуда не уходит)
+if [ ! -s "$SSL/key.pem" ]; then
+  openssl ecparam -genkey -name prime256v1 -noout -out "$SSL/key.pem" && chmod 600 "$SSL/key.pem"
+fi
+if [ ! -s "$SSL/csr.pem" ]; then
+  openssl req -new -key "$SSL/key.pem" -subj "/CN=$DOMAIN" \
+    -addext "subjectAltName=DNS:$DOMAIN,DNS:www.$DOMAIN" -out "$SSL/csr.pem"
+fi
+cp "$SSL/csr.pem" "$CHAL/csr.pem"
 
-write_nginx   # http-конфиг с проверочной папкой acme
-
-# acme.sh: ставим из GitHub, если его ещё нет
-if [ ! -x "$ACME" ]; then
-  rm -rf /tmp/acme.sh-src
-  git clone -q --depth 1 https://github.com/acmesh-official/acme.sh.git /tmp/acme.sh-src || exit 1
-  (cd /tmp/acme.sh-src && ./acme.sh --install --home "$ACME_HOME" ${EMAIL:+-m "$EMAIL"} >/dev/null) || exit 1
+# 2. проверочные файлы Let's Encrypt из репозитория
+find "$CHAL" -maxdepth 1 -type f ! -name csr.pem ! -name nm-status.txt -delete
+if [ -d "$DIR/certs/challenges" ]; then
+  cp "$DIR"/certs/challenges/* "$CHAL"/ 2>/dev/null || true
 fi
 
-issue() {  # $1 = letsencrypt | zerossl
-  "$ACME" --issue --server "$1" -d "$DOMAIN" -d "www.$DOMAIN" -w "$ACME_WEBROOT" --keylength ec-256 --force
-}
-
-ok=""
-echo "$(date '+%F %T') HTTPS: пробую Let's Encrypt"
-if issue letsencrypt; then ok=1
-elif [ -n "$EMAIL" ]; then
-  echo "$(date '+%F %T') HTTPS: Let's Encrypt не ответил, пробую ZeroSSL"
-  "$ACME" --register-account --server zerossl -m "$EMAIL" >/dev/null 2>&1 || true
-  issue zerossl && ok=1
-else
-  echo "$(date '+%F %T') HTTPS: для запасного варианта ZeroSSL нужна почта — запустите один раз: EMAIL=почта bash $0"
+# 3. готовый сертификат из репозитория — ставим, если он новый и подходит к нашему ключу
+NEW="$DIR/certs/fullchain.pem"
+if [ -s "$NEW" ] && ! cmp -s "$NEW" "$SSL/fullchain.pem"; then
+  if [ "$(openssl x509 -in "$NEW" -noout -pubkey 2>/dev/null)" = "$(openssl pkey -in "$SSL/key.pem" -pubout 2>/dev/null)" ]; then
+    cp "$NEW" "$SSL/fullchain.pem"
+    echo "$(date '+%F %T') HTTPS: установлен сертификат до $(openssl x509 -in "$NEW" -noout -enddate | cut -d= -f2)"
+    write_nginx
+    python3 "$DIR/build.py" >/dev/null   # ссылки сайта переключатся на https
+  else
+    echo "$(date '+%F %T') HTTPS: сертификат в репозитории не подходит к ключу сервера, жду новый"
+  fi
 fi
 
-if [ -n "$ok" ]; then
-  "$ACME" --install-cert -d "$DOMAIN" --ecc \
-    --key-file "$SSL/key.pem" --fullchain-file "$SSL/fullchain.pem" \
-    --reloadcmd "bash $DIR/deploy/https.sh nginx"
-  write_nginx
-  python3 "$DIR/build.py" >/dev/null   # ссылки на сайте переключатся на https
-  echo "$(date '+%F %T') HTTPS включён: https://$DOMAIN"
-else
-  echo "$(date '+%F %T') HTTPS пока не получился, повторю через 15 минут"
-  exit 1
-fi
+write_nginx

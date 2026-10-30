@@ -1,0 +1,24 @@
+# HTTPS-сертификат Let's Encrypt для novosti-max.com.
+# С сервера в России Let's Encrypt недоступен, поэтому выпускаем здесь, по запросу (CSR) сервера.
+# Секретный ключ остаётся на сервере; сюда попадает только публичный сертификат (certs/fullchain.pem).
+name: HTTPS-сертификат
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 3 * * 1"        # каждый понедельник проверяем, не пора ли продлить
+  push:
+    branches: [main]
+    paths: [".github/workflows/cert.yml", "deploy/cert-issue.sh", "deploy/cert-hook.sh"]
+permissions:
+  contents: write
+concurrency: cert
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Установить certbot
+        run: sudo apt-get update -q && sudo apt-get install -yq certbot
+      - name: Выпустить или продлить сертификат
+        run: bash deploy/cert-issue.sh

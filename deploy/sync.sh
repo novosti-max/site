@@ -1,19 +1,36 @@
 #!/usr/bin/env bash
-# Каждые 10 минут: если в GitHub появились правки — подтянуть и пересобрать сайт.
-# Пока нет HTTPS-сертификата — попробовать его получить (не чаще одного запуска одновременно).
+# Раз в минуту (cron): подтянуть правки из GitHub, пересобрать сайт при изменениях,
+# обслужить HTTPS (проверочные файлы и новый сертификат — см. deploy/https.sh).
 cd /opt/novosti-max || exit 0
+exec 9>/tmp/novosti-max-sync.lock
+flock -n 9 || exit 0
+
 if git fetch -q origin main && [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
   git reset -q --hard origin/main
   python3 build.py >/dev/null && echo "$(date '+%F %T') подтянуты правки $(git rev-parse --short HEAD)"
 fi
-if [ ! -s /etc/ssl/novosti-max/fullchain.pem ]; then
-  flock -n /tmp/novosti-max-https.lock bash /opt/novosti-max/deploy/https.sh
+
+bash /opt/novosti-max/deploy/https.sh
+
+# расписание: синхронизация раз в минуту, обновление цифр в 06:10 МСК
+CRON_WANT='SHELL=/bin/bash
+10 6 * * * root cd /opt/novosti-max && git pull -q --ff-only; python3 /opt/novosti-max/update.py >> /var/log/novosti-max.log 2>&1
+* * * * * root bash /opt/novosti-max/deploy/sync.sh >> /var/log/novosti-max.log 2>&1'
+if [ "$(cat /etc/cron.d/novosti-max 2>/dev/null)" != "$CRON_WANT" ]; then
+  printf '%s\n' "$CRON_WANT" > /etc/cron.d/novosti-max.tmp && mv /etc/cron.d/novosti-max.tmp /etc/cron.d/novosti-max
+  chmod 644 /etc/cron.d/novosti-max
 fi
-# временно: последние строки лога для диагностики HTTPS (без входа на сервер)
-mkdir -p /var/www/acme/.well-known/acme-challenge
-{ date '+%F %T';
-  for u in https://acme-v02.api.letsencrypt.org/directory https://acme.zerossl.com/v2/DV90 https://api.zerossl.com/ https://dv.acme-v02.api.pki.goog/directory https://acme.ssl.com/sslcom-dv-rsa https://acme.digicert.com/v2/acme/directory/; do
-    echo "$u -> $(curl -sS -m 15 -o /dev/null -w '%{http_code} %{time_total}s ip=%{remote_ip}' "$u" 2>&1)"; done
-  echo "eab admin: $(curl -sS -m 15 -X POST -d email=admin@novosti-max.com https://api.zerossl.com/acme/eab-credentials-email 2>&1 | head -c 200)"
-  getent ahosts acme-v02.api.letsencrypt.org | head -3
-  ls -la /etc/ssl/novosti-max/ 2>&1; ls /root/.acme.sh 2>&1 | head; nginx -T 2>/dev/null | grep -E "listen|ssl_certificate|acme" ; echo ---; tail -n 60 /var/log/novosti-max.log; } > /var/www/acme/.well-known/acme-challenge/nm-status.txt 2>&1
+
+# короткий статус для проверки снаружи (ничего секретного)
+{
+  date '+%F %T'
+  echo "commit $(git rev-parse --short HEAD)"
+  if [ -s /etc/ssl/novosti-max/fullchain.pem ]; then
+    echo "cert: $(openssl x509 -in /etc/ssl/novosti-max/fullchain.pem -noout -enddate)"
+  else
+    echo "cert: нет"
+  fi
+  echo "challenges: $(ls /var/www/acme/.well-known/acme-challenge | grep -vc -e csr.pem -e nm-status.txt)"
+  echo ---
+  tail -n 15 /var/log/novosti-max.log
+} > /var/www/acme/.well-known/acme-challenge/nm-status.txt 2>&1
