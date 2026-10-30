@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Установка сайта «Новости в MAX» на чистый Ubuntu-сервер. Запускать от root один раз:
-#   curl -fsSL https://raw.githubusercontent.com/<OWNER>/novosti-max/main/deploy/install.sh | REPO=https://github.com/<OWNER>/novosti-max.git bash
+#   bash <(curl -fsSL https://raw.githubusercontent.com/novosti-max/site/main/deploy/install.sh)
 # Повторный запуск безопасен: обновит код, конфиг и пересоберёт сайт.
 set -euo pipefail
 
-REPO="${REPO:?укажите REPO=https://github.com/<OWNER>/novosti-max.git}"
+REPO="${REPO:-https://github.com/novosti-max/site.git}"
 DOMAIN="${DOMAIN:-novosti-max.com}"
 EMAIL="${EMAIL:-}"          # почта для уведомлений Let's Encrypt (необязательно)
 DIR=/opt/novosti-max
@@ -52,6 +52,8 @@ timedatectl set-timezone Europe/Moscow || true
 cat > /etc/cron.d/novosti-max <<CRON
 SHELL=/bin/bash
 10 6 * * * root cd $DIR && git pull -q --ff-only; python3 $DIR/update.py >> /var/log/novosti-max.log 2>&1
+# HTTPS: пока сертификата нет, пробуем каждые 15 минут (ждём, когда DNS домена обновится)
+*/15 * * * * root [ -d /etc/letsencrypt/live/$DOMAIN ] || certbot --nginx -n --agree-tos --redirect --register-unsafely-without-email -d $DOMAIN -d www.$DOMAIN >> /var/log/novosti-max.log 2>&1
 CRON
 chmod 644 /etc/cron.d/novosti-max
 
@@ -61,7 +63,7 @@ if getent hosts "$DOMAIN" | grep -q "$IP"; then
   certbot --nginx -n --agree-tos --redirect ${EMAIL:+-m "$EMAIL"} ${EMAIL:---register-unsafely-without-email} -d "$DOMAIN" -d "www.$DOMAIN" || true
   echo "HTTPS включён"
 else
-  echo "Домен $DOMAIN ещё не указывает на $IP. Когда DNS обновится, запустите: certbot --nginx -d $DOMAIN -d www.$DOMAIN --redirect"
+  echo "Домен $DOMAIN ещё не указывает на $IP. HTTPS включится сам в течение 15 минут после обновления DNS."
 fi
 
 echo "Готово. Сайт: http://$DOMAIN  (IP $IP). Лог обновлений: /var/log/novosti-max.log"
