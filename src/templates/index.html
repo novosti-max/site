@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_row.html" import table %}
+{% import "_contacts.html" as contacts with context %}
 {% block title %}Реклама в каналах MAX по городам России — медиакит «Новости в MAX»{% endblock %}
 {% block description %}Реклама в мессенджере MAX: {{ totals.count }} каналов в {{ totals.regions }} регионах — радары, городские новости и федеральные медиа. {{ totals.subs|short }} подписок. Выберите города и каналы, соберите подборку и запросите стоимость.{% endblock %}
 {% block head %}
@@ -15,6 +16,7 @@
         <a class="btn btn--blue btn--big" href="#catalog">Выбрать каналы</a>
         <a class="btn btn--line btn--big" href="#package">Вся сеть за {{ site.package_price|num }} ₽</a>
       </div>
+      {{ contacts.strip() }}
       <dl class="facts">
         <div><dt>Каналов в сети</dt><dd>{{ totals.count }}</dd></div>
         <div><dt>Подписок суммарно</dt><dd>{{ totals.subs|short }}</dd></div>
@@ -108,6 +110,8 @@
     </div>
   </div>
 </section>
+
+{{ contacts.section() }}
 
 <section class="sec" id="how">
   <div class="wrap">

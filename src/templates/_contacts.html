@@ -1,0 +1,48 @@
+{# Контакты рекламодателю. Пустые поля (telegram, email) просто не показываются. #}
+{% set c = site.contacts %}
+
+{% macro tg_url(v) -%}
+{%- if v.startswith('http') -%}{{ v }}{%- else -%}https://t.me/{{ v.lstrip('@') }}{%- endif -%}
+{%- endmacro %}
+{% macro tg_label(v) -%}
+@{{ v.rstrip('/').split('/')[-1].lstrip('@') }}
+{%- endmacro %}
+
+{# компактная карточка: первый экран главной и страницы городов #}
+{% macro strip() %}
+<div class="cstrip">
+  <div class="cstrip__who">
+    <span class="cstrip__ava" aria-hidden="true">{{ c.name[0] }}</span>
+    <span><b>{{ c.name }}</b><span class="cstrip__role">{{ c.role }}</span></span>
+  </div>
+  <div class="cstrip__links">
+    {% if c.max %}<a class="clink clink--max" href="{{ c.max }}" target="_blank" rel="noopener">MAX</a>{% endif %}
+    {% if c.telegram %}<a class="clink clink--tg" href="{{ tg_url(c.telegram) }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
+    {% if c.email %}<a class="clink clink--mail" href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{# полный раздел «Контакты» #}
+{% macro section() %}
+<section class="sec sec--contacts" id="contacts">
+  <div class="wrap contacts">
+    <div>
+      <h2 class="h2">Контакты</h2>
+      <p class="sec__lead">По размещению рекламы, ценам, свободным датам и внешним проектам пишите напрямую.</p>
+    </div>
+    <div class="ccard">
+      <div class="ccard__who">
+        <span class="cstrip__ava cstrip__ava--big" aria-hidden="true">{{ c.name[0] }}</span>
+        <div><p class="ccard__name">{{ c.name }}</p><p class="ccard__role">{{ c.role }}</p></div>
+      </div>
+      <ul class="ccard__list">
+        {% if c.max %}<li><span>MAX</span><a href="{{ c.max }}" target="_blank" rel="noopener">Написать в MAX</a></li>{% endif %}
+        {% if c.telegram %}<li><span>Telegram</span><a href="{{ tg_url(c.telegram) }}" target="_blank" rel="noopener">{{ tg_label(c.telegram) }}</a></li>{% endif %}
+        {% if c.email %}<li><span>Почта</span><a href="mailto:{{ c.email }}">{{ c.email }}</a></li>{% endif %}
+      </ul>
+      {% if c.max %}<a class="btn btn--blue btn--wide" href="{{ c.max }}" target="_blank" rel="noopener">Обсудить размещение</a>{% endif %}
+    </div>
+  </div>
+</section>
+{% endmacro %}

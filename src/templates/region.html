@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_row.html" import table %}
+{% import "_contacts.html" as contacts with context %}
 {% set radars = page.channels|selectattr("type", "equalto", "radar")|list %}
 {% set cities = page.channels|selectattr("type", "equalto", "city")|list %}
 {% set media = page.channels|selectattr("type", "equalto", "media")|list %}
@@ -29,6 +30,7 @@
       <button class="btn btn--blue btn--big" type="button" data-add-ids="{{ page.channels|map(attribute='id')|join(',') }}">Добавить {{ 'все каналы' if page.count > 1 else 'канал' }} в подборку</button>
       <a class="btn btn--line btn--big" href="{{ site.contact_url }}" target="_blank" rel="noopener">Узнать цену в MAX</a>
     </div>
+    {{ contacts.strip() }}
   </div>
 </section>
 
@@ -55,4 +57,5 @@
     </ul>
   </div>
 </section>
+{{ contacts.section() }}
 {% endblock %}

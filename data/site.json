@@ -7,5 +7,12 @@
   "package_price": 400000,
   "yandex_verification": "",
   "google_verification": "",
-  "yandex_metrika": ""
+  "yandex_metrika": "",
+  "contacts": {
+    "name": "Илья",
+    "role": "Размещение рекламы в сети",
+    "max": "https://clck.ru/3SYhWp",
+    "telegram": "",
+    "email": ""
+  }
 }
