@@ -136,11 +136,16 @@ class Bot:
 
     # --- подготовка
     def resolve_chats(self):
+        try:
+            chats = self.max.chats()
+        except Exception as e:
+            log.error("не удалось получить список каналов MAX: %s", e)
+            return
         self.chat_to_source = {}
-        for c in self.max.chats():
+        for c in chats:
             link = norm_link(c.get("link") or "")
             if link:
-                self.chat_to_source[c["chat_id"]] = link
+                self.chat_to_source[c.get("chat_id")] = link
         wanted = {norm_link(g["source"]) for g in self.groups}
         missing = wanted - set(self.chat_to_source.values())
         if missing:
@@ -293,7 +298,14 @@ def main():
             print(c.get("chat_id"), c.get("type"), c.get("title"), c.get("link"))
         return
     dry = a.dry_run or bool(secrets.get("dry_run"))
-    Bot(cfg, secrets, dry).run()
+    try:
+        Bot(cfg, secrets, dry).run()
+    except SystemExit:
+        raise
+    except Exception:
+        log.exception("бот упал")
+        time.sleep(30)
+        raise
 
 
 if __name__ == "__main__":

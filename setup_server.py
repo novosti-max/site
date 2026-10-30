@@ -153,7 +153,6 @@ def page(key, msg=""):
                    f"<input type=password name='vk_{g['slug']}' autocomplete=off placeholder='{'задан' if vkkeys.get(g['slug']) else 'вставьте ключ группы'}'>"
                    f"<p class=small>{mark(ok)} ВК: {html.escape(text)} &nbsp; {mark(seen if mok else None)} "
                    f"MAX-канал {html.escape(g['source'])}: {'бот видит канал' if seen else 'бот не админ в канале' if mok else 'проверю после токена'}</p>"
-                   + (f"<button class=sec formaction='/{key}/test/{g['slug']}'>Проверить публикацию</button>" if ok else "")
                    + "</div>")
     dry = s.get("dry_run", False)
     out.append(f"<h2>3. Режим</h2><div class=card><label><input type=checkbox name=dry_run {'checked' if dry else ''}> "
