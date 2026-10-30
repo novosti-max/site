@@ -79,6 +79,17 @@ def vk_call(method, token, **params):
     raise RuntimeError(f"VK {method}: не получилось после повторов")
 
 
+def vk_upload_photo(token, image_bytes):
+    """Загрузка фото ключом сообщества. Загрузка «на стену» ключу сообщества недоступна,
+    поэтому грузим через сервер сообщений сообщества и прикрепляем к посту с access_key."""
+    srv = vk_call("photos.getMessagesUploadServer", token)
+    up = requests.post(srv["upload_url"], files={"photo": ("photo.jpg", image_bytes, "image/jpeg")}, timeout=60).json()
+    if not up.get("photo") or up.get("photo") == "[]":
+        raise RuntimeError(f"ВК не принял файл: {str(up)[:120]}")
+    ph = vk_call("photos.saveMessagesPhoto", token, photo=up["photo"], server=up["server"], hash=up["hash"])[0]
+    return f"photo{ph['owner_id']}_{ph['id']}" + (f"_{ph['access_key']}" if ph.get("access_key") else "")
+
+
 # ---------------------------------------------------------------- MAX
 class MAX:
     def __init__(self, token: str):
@@ -190,6 +201,24 @@ class Bot:
         self.state.d["quiet"][slug] = stamps + [now]
         return True
 
+    def media_attachments(self, g, atts):
+        """Фото из поста MAX -> фото во ВК (до 4 штук). Ошибка — пост уйдёт текстом."""
+        if not self.rules.get("media", True) or self.dry:
+            return []
+        if g["slug"] in self.state.d.setdefault("media_off", {}):
+            return []
+        urls = [((a.get("payload") or {}).get("url")) for a in atts if a.get("type") == "image"]
+        urls = [u for u in urls if u][:4]
+        out = []
+        for u in urls:
+            try:
+                img = requests.get(u, timeout=30)
+                img.raise_for_status()
+                out.append(vk_upload_photo(self.token(g), img.content))
+            except Exception as e:
+                log.warning("фото для %s не загрузилось: %s", g["vk"], e)
+        return out
+
     def handle(self, msg):
         rec, body = msg.get("recipient", {}), msg.get("body", {}) or {}
         if rec.get("chat_type") != "channel":
@@ -244,6 +273,15 @@ class Bot:
                     if time.time() - used.get(ck, 0) >= gap:   # карточка только у первого поста серии
                         att = (g.get("cards") or {}).get(ck)
                         used[ck] = time.time()
+                if not att:                                    # нет карточки — берём фото из самого поста
+                    photos = self.media_attachments(g, atts)
+                    if photos:
+                        try:
+                            self.post(g, clean, ",".join(photos))
+                            continue
+                        except Exception as e:
+                            log.warning("пост с фото в %s не прошёл (%s) — фото для этой группы отключаю, публикую текстом", g["vk"], e)
+                            self.state.d["media_off"][g["slug"]] = str(e)[:200]
                 self.post(g, clean, att)
             except Exception as e:
                 log.error("ошибка публикации в %s: %s", g["vk"], e)
