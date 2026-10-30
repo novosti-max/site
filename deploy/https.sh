@@ -19,6 +19,7 @@ if [ -n "${EMAIL:-}" ]; then
   echo "$EMAIL" > "$CONF/email"; chmod 600 "$CONF/email"
 fi
 EMAIL="$(cat "$CONF/email" 2>/dev/null || true)"
+EMAIL="${EMAIL:-admin@$DOMAIN}"   # служебный адрес для регистрации в ZeroSSL
 
 have_cert() { [ -s "$SSL/fullchain.pem" ] && [ -s "$SSL/key.pem" ]; }
 
