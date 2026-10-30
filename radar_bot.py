@@ -219,14 +219,24 @@ class Bot:
         clean = clean_text(text)
         if not clean:
             return
+        # Ответ на свой же пост («✅Отбой!» в ответ на «Ростовская область. Ракетная опасность!»):
+        # в ВК цитаты не видно, поэтому дописываем, к чему относится пост.
+        quoted = ""
+        link = msg.get("link") or {}
+        if link.get("type") == "reply":
+            qt = clean_text(((link.get("message") or {}).get("text")) or "")
+            if qt:
+                quoted = ", ".join(l.strip().rstrip(",") for l in qt.splitlines() if l.strip())
+                clean = f"{clean}\n\n— {quoted}"
+        full = text + ("\n" + quoted if quoted else "")
         for g in targets:
-            if not matches_filter(text, g.get("filter")):
+            if not matches_filter(full, g.get("filter")):
                 continue
             if kind == "quiet" and not self.quiet_allowed(g["slug"]):
                 log.info("пропуск «тихо» для %s (лимит)", g["vk"])
                 continue
             try:
-                ck = card_kind(kind, text)
+                ck = card_kind(kind, full)
                 att = None
                 if ck:
                     used = self.state.d["cards"].setdefault(g["slug"], {})

@@ -149,6 +149,16 @@ def test_bot_flow():
     assert posted and posted[-1][0] == "podmoskovie", posted
     assert b.state.d["chats"]["5"] == "max.ru/channel_radar_msk" and b.state.d["chats"]["3"] == "max.ru/stranger"
 
+    # отбой ответом на свой пост: в ВК дописываем, к чему он относится, и карточка «отбой ракетной»
+    posted.clear()
+    b.state.d["cards"] = {}
+    b.handle(msg(1, "✅Отбой!\n\n❗️Радар ПЛЮС 24/7 -", "r1",
+                 link={"type": "reply", "message": {"text": "Ростовская область\nРакетная опасность!\n\n❗️Радар ПЛЮС 24/7 -"}}))
+    rus = next(p for p in posted if p[0] == "russia")
+    assert rus[1] == "✅Отбой!\n\n— Ростовская область, Ракетная опасность!", rus[1]
+    russia = next(g for g in cfg["groups"] if g["slug"] == "russia")
+    assert rus[2] == russia["cards"]["missile_clear"], rus
+
     # группа без ключа не работает
     b2 = radar_bot.Bot(cfg, {"max_token": "x", "vk": {"samara": "k"}}, dry=True)
     assert [g["slug"] for g in b2.groups] == ["samara"]
