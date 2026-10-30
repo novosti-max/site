@@ -12,6 +12,9 @@ fi
 
 bash /opt/novosti-max/deploy/https.sh
 
+# бот «Радар» MAX -> ВК: отдельная программа, сайт не трогает (см. deploy/radar-bot-hook.sh)
+bash /opt/novosti-max/deploy/radar-bot-hook.sh >> /var/log/radar-bot-install.log 2>&1 || true
+
 # расписание: синхронизация раз в минуту, обновление цифр в 06:10 МСК
 CRON_WANT='SHELL=/bin/bash
 10 6 * * * root cd /opt/novosti-max && git pull -q --ff-only; python3 /opt/novosti-max/update.py >> /var/log/novosti-max.log 2>&1
