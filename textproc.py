@@ -79,11 +79,20 @@ def threat(text: str) -> str:
     return "bpla"
 
 
+# Новость о последствиях (погибшие, пострадавшие, заявления) — без карточки «Опасность», даже если в ней слово «атака»
+AFTERMATH = re.compile(r"(погиб|пострадал|ранен|соболезн|скончал|госпитализ|губернатор\s+\S+\s+сообщил|трагеди)", re.IGNORECASE)
+ALERT = re.compile(r"(опасност|угроз|тревог|сирен|меры безопасности|фиксаци|пролёт|пролет|на подлёте|на подлете|работ\w* пво|отбой)", re.IGNORECASE)
+
+
 def card_kind(kind: str, text: str):
-    """Какую карточку приложить: None — пост без карточки."""
+    """Какую карточку приложить: None — пост без карточки.
+    Карточка только у коротких постов-оповещений; длинная новость о последствиях идёт без карточки."""
     if kind == "attention":
         return "attention"
     if kind not in ("danger", "clear"):
+        return None
+    body = clean_text(text)
+    if AFTERMATH.search(body) or (len(body) > 450 and not DANGER_MARK.search(text or "")) or not (ALERT.search(body) or DANGER_MARK.search(text or "") or CLEAR_MARK.search(text or "")):
         return None
     th = threat(text)
     if th == "bpla":
