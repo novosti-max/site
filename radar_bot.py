@@ -261,7 +261,31 @@ class Bot:
                 log.error("ошибка поста-перелива в %s: %s", g["vk"], e)
         self.state.save()
 
+    def cleanup_once(self):
+        """Разово: убрать подпись «❗️Радар ПЛЮС 24/7 -» из уже вышедших постов бота (до исправления фильтра)."""
+        if self.dry or self.state.d.get("cleanup_v1"):
+            return
+        for g in self.groups:
+            try:
+                items = vk_call("wall.get", self.token(g), owner_id=-int(g["gid"]), count=60).get("items", [])
+                for it in items:
+                    if time.time() - it.get("date", 0) > 86400:
+                        continue
+                    new = clean_text(it.get("text") or "")
+                    if new and new != (it.get("text") or "").strip():
+                        att = ",".join(f"{a['type']}{a[a['type']]['owner_id']}_{a[a['type']]['id']}"
+                                       for a in it.get("attachments", []) if a.get("type") == "photo")
+                        vk_call("wall.edit", self.token(g), owner_id=-int(g["gid"]), post_id=it["id"], message=new,
+                                **({"attachments": att} if att else {}))
+                        log.info("поправил подпись в %s (пост %s)", g["vk"], it["id"])
+                        time.sleep(0.4)
+            except Exception as e:
+                log.warning("чистка %s: %s", g["vk"], e)
+        self.state.d["cleanup_v1"] = True
+        self.state.save()
+
     def run(self):
+        self.cleanup_once()
         self.resolve_chats()
         log.info("старт: %d групп, %d каналов видно%s", len(self.groups), len(self.chat_to_source), " (ПРОБНЫЙ РЕЖИМ)" if self.dry else "")
         secrets_mtime = os.path.getmtime(SECRETS_FILE) if os.path.exists(SECRETS_FILE) else 0
