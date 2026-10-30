@@ -343,6 +343,39 @@ class Bot:
         self.state.d["cleanup_v1"] = True
         self.state.save()
 
+    SHARE_TEXT = ("Дорогие друзья! ❤️\n\n"
+                  "Наша безопасность начинается с каждого из нас. Перешлите эту запись родным, соседям и коллегам, "
+                  "скиньте в домовой и рабочий чат.\n\n"
+                  "Чем больше людей узнают об опасности вовремя, тем спокойнее всем.\n\n"
+                  "🔔 Подпишитесь на группу и включите уведомления — сигнал об опасности придёт даже ночью.\n\n"
+                  "Вместе мы сила! 🙏")
+
+    def share_post(self):
+        """Пост «Перешлите родным» без ссылок, с картинкой: первый раз в share_first, дальше раз в N дней в share_hour."""
+        now = dt.datetime.now(self.tz)
+        last = self.state.d.setdefault("share", {})
+        first = self.rules.get("share_first")
+        every = int(self.rules.get("share_every_days", 3))
+        for g in self.groups:
+            att = (g.get("cards") or {}).get("share")
+            if not att:
+                continue
+            prev = last.get(g["slug"])
+            if prev is None:
+                due = bool(first) and now >= dt.datetime.strptime(first, "%Y-%m-%d %H:%M").replace(tzinfo=self.tz)
+            else:
+                days = (now.date() - dt.date.fromisoformat(prev)).days
+                due = days >= every and now.hour >= int(self.rules.get("share_hour", 12))
+            if not due:
+                continue
+            try:
+                self.post(g, self.SHARE_TEXT, att)
+                if not self.dry:
+                    last[g["slug"]] = now.date().isoformat()
+            except Exception as e:
+                log.error("ошибка поста «перешлите» в %s: %s", g["vk"], e)
+        self.state.save()
+
     def run(self):
         self.cleanup_once()
         self.resolve_chats()
@@ -363,6 +396,7 @@ class Bot:
                     self.state.d["marker"] = r["marker"]
                     self.state.save()
                 self.promo()
+                self.share_post()
             except requests.RequestException as e:
                 log.warning("сеть: %s, повтор через 5 с", e)
                 time.sleep(5)
