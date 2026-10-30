@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Реклама в MAX по городам и регионам России — Новости в MAX{% endblock %}
+{% block description %}Каналы MAX для рекламы в {{ totals.regions }} регионах России: Москва, Санкт-Петербург, Самара, Казань, Воронеж и другие. Радары и городские новости, {{ totals.subs|short }} подписок.{% endblock %}
+{% block main %}
+<section class="hero hero--region">
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a> / <span>Города</span></nav>
+    <h1 class="hero__h hero__h--region">Реклама в MAX по городам</h1>
+    <p class="hero__lead">Выберите регион, чтобы увидеть его радары и городские новостные каналы с подписчиками. Федеральные каналы работают на всю страну.</p>
+  </div>
+</section>
+<section class="sec">
+  <div class="wrap">
+    <ul class="regions">
+      {% if federal_page %}
+      <li><a class="region region--fed" href="/reklama/{{ federal_page.slug }}/"><span class="region__name">Вся Россия</span><span class="region__meta">{{ federal_page.count }} {{ plural(federal_page.count, 'канал', 'канала', 'каналов') }}</span><span class="region__subs">{{ federal_page.subs|short }}</span></a></li>
+      {% endif %}
+      {% for r in region_pages %}
+      <li><a class="region" href="/reklama/{{ r.slug }}/"><span class="region__name">{{ r.name }}</span><span class="region__meta">{{ r.count }} {{ plural(r.count, 'канал', 'канала', 'каналов') }}</span><span class="region__subs">{{ r.subs|short }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}

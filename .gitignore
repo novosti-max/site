@@ -1,0 +1,5 @@
+public/
+data/stats.json
+data/stats.json.tmp
+data/ava/
+__pycache__/

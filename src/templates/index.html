@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% from "_row.html" import table %}
+{% block title %}Реклама в каналах MAX по городам России — медиакит «Новости в MAX»{% endblock %}
+{% block description %}Реклама в мессенджере MAX: {{ totals.count }} каналов в {{ totals.regions }} регионах — радары, городские новости и федеральные медиа. {{ totals.subs|short }} подписок. Выберите города и каналы, соберите подборку и запросите стоимость.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"{{ site.brand }}","url":"{{ site.domain }}/","description":"Рекламная сеть каналов в мессенджере MAX: радары, городские новости и федеральные медиа"}</script>
+{% endblock %}
+{% block main %}
+<section class="hero">
+  <div class="wrap hero__in">
+    <div class="hero__copy">
+      <h1 class="hero__h">Реклама в&nbsp;каналах MAX для&nbsp;вашего города</h1>
+      <p class="hero__lead">{{ totals.count }} {{ plural(totals.count, 'канал', 'канала', 'каналов') }} в {{ totals.regions }} регионах: радары, городские новости и федеральные медиа. Выберите города, соберите подборку и отправьте заявку в пару кликов.</p>
+      <div class="hero__cta">
+        <a class="btn btn--blue btn--big" href="#catalog">Выбрать каналы</a>
+        <a class="btn btn--line btn--big" href="#package">Вся сеть за {{ site.package_price|num }} ₽</a>
+      </div>
+      <dl class="facts">
+        <div><dt>Каналов в сети</dt><dd>{{ totals.count }}</dd></div>
+        <div><dt>Подписок суммарно</dt><dd>{{ totals.subs|short }}</dd></div>
+        {% if has_views %}<div><dt>Просмотров за 24 ч</dt><dd>{{ totals.views|short }}</dd></div>{% else %}<div><dt>Регионов</dt><dd>{{ totals.regions }}</dd></div>{% endif %}
+      </dl>
+      <p class="stamp">Данные MaxFrame на {{ updated_human }}, обновляются ежедневно</p>
+    </div>
+
+    <figure class="board" aria-labelledby="board-cap">
+      <figcaption class="board__cap" id="board-cap">Крупнейшие регионы сети по подпискам</figcaption>
+      {% set top = top_regions[0].subs %}
+      <ol class="board__list">
+        {% for r in top_regions %}
+        <li>
+          <a class="board__row" href="/reklama/{{ r.slug }}/">
+            <span class="board__name">{{ r.name }}</span>
+            <span class="board__val">{{ r.subs|short }}</span>
+            <span class="board__bar" style="--w: {{ (r.subs / top * 100)|round(1) }}%; --i: {{ loop.index0 }}"></span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+      <a class="board__all" href="/reklama/">Все {{ totals.regions }} регионов</a>
+    </figure>
+  </div>
+</section>
+
+<section class="sec" id="catalog">
+  <div class="wrap">
+    <div class="sec__head">
+      <h2 class="h2">Каталог каналов</h2>
+      <p class="sec__lead">Отметьте каналы плюсом: подборка соберёт аудиторию и подготовит текст заявки.</p>
+    </div>
+
+    <div class="filters" role="search">
+      <div class="seg" role="radiogroup" aria-label="Тип канала">
+        <button type="button" role="radio" aria-checked="true" data-type-filter="all">Все <span>{{ totals.count }}</span></button>
+        <button type="button" role="radio" aria-checked="false" data-type-filter="radar">Радары <span>{{ totals.radar }}</span></button>
+        <button type="button" role="radio" aria-checked="false" data-type-filter="city">Городские <span>{{ totals.city }}</span></button>
+        <button type="button" role="radio" aria-checked="false" data-type-filter="media">Медиа <span>{{ totals.media }}</span></button>
+      </div>
+      <label class="fld">
+        <span class="sr">Город или регион</span>
+        <select data-region-filter>
+          <option value="">Все города и регионы</option>
+          {% if federal_page %}<option value="{{ federal_page.slug }}">Вся Россия</option>{% endif %}
+          {% for r in region_pages %}<option value="{{ r.slug }}">{{ r.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="fld fld--search">
+        <span class="sr">Поиск по названию</span>
+        <input type="search" placeholder="Поиск: город или канал" data-search>
+      </label>
+      <label class="fld">
+        <span class="sr">Сортировка</span>
+        <select data-sort>
+          <option value="subs">Сначала крупные</option>
+          {% if has_views %}<option value="views">По просмотрам</option>{% endif %}
+          <option value="name">По алфавиту</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="cat-bar">
+      <p class="cat-bar__found" aria-live="polite">Показано <b data-shown>{{ totals.count }}</b> из {{ totals.count }}</p>
+      <button class="linkbtn" type="button" data-add-shown>Добавить показанные в подборку</button>
+    </div>
+
+    {{ table(channels, has_views, id="cat") }}
+    <button class="btn btn--line more" type="button" data-more hidden>Показать все {{ totals.count }} каналов</button>
+    <p class="empty" data-empty hidden>По этому запросу каналов нет. Сбросьте фильтр или попробуйте другое название города.</p>
+    <p class="muted small note">Подписчики{% if has_views %} и просмотры за 24 часа{% endif %} взяты из статистики MaxFrame и не являются прогнозом охвата рекламного поста. Стоимость отдельных каналов сообщаем по запросу.</p>
+  </div>
+</section>
+
+<section class="sec sec--ink" id="package">
+  <div class="wrap pack">
+    <div>
+      <h2 class="h2">Вся сеть одним размещением</h2>
+      <p class="pack__lead">Пост выходит во всех {{ totals.count }} каналах: {{ totals.radar }} радаров, {{ totals.city }} городских новостников и {{ totals.media }} федеральных медиа. Подходит для федеральных брендов и запусков с широкой географией.</p>
+      <ul class="pack__list">
+        <li>{{ totals.subs|short }} подписок суммарно</li>
+        <li>{{ totals.regions }} регионов: от Москвы и Петербурга до Омска и Новосибирска</li>
+        <li>Один счёт и один отчёт по всем каналам</li>
+      </ul>
+    </div>
+    <div class="pack__price">
+      <p class="pack__sum">{{ site.package_price|num }} ₽</p>
+      <p class="pack__sub">за пост во всей сети. Формат и дату согласуем перед размещением.</p>
+      <button class="btn btn--white btn--wide" type="button" data-add-all>Выбрать всю сеть</button>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="how">
+  <div class="wrap">
+    <h2 class="h2">Как разместить рекламу</h2>
+    <ol class="steps">
+      <li><h3>Соберите подборку</h3><p>Выберите город или регион, сравните каналы и добавьте подходящие плюсом. Можно взять всю сеть целиком.</p></li>
+      <li><h3>Отправьте заявку</h3><p>Укажите, что рекламируете, и желаемую дату. Скопируйте готовый текст и отправьте нам в MAX.</p></li>
+      <li><h3>Согласуйте и запускайте</h3><p>Ответим со стоимостью и свободными датами, согласуем текст поста и маркировку, опубликуем и пришлём отчёт.</p></li>
+    </ol>
+
+    <h2 class="h2 h2--sm">Частые вопросы</h2>
+    <div class="faq">
+      <details><summary>Сколько стоит реклама в одном канале?</summary><p>Цена зависит от канала, формата и даты, поэтому отдельные прайсы мы не публикуем. Добавьте каналы в подборку и отправьте заявку: ответим с точной стоимостью.</p></details>
+      <details><summary>Как считается суммарная аудитория?</summary><p>Мы складываем подписчиков выбранных каналов. Один человек может быть подписан на несколько каналов, поэтому сумма больше числа уникальных людей. С просмотрами так же.</p></details>
+      <details><summary>Насколько свежие цифры?</summary><p>Сайт обновляет статистику из MaxFrame каждый день. Сейчас показаны данные на {{ updated_human }}.</p></details>
+      <details><summary>Какие форматы есть?</summary><p>Пост в ленте, закреп, пост с кнопкой или опросом. Тексты и креативы можем подготовить сами. Рекламу маркируем по закону.</p></details>
+      <details><summary>Заявка отправляется автоматически?</summary><p>Нет. Сайт собирает текст заявки, вы копируете его и отправляете нам в MAX. Выбор каналов на сайте не бронирует дату.</p></details>
+    </div>
+  </div>
+</section>
+{% endblock %}

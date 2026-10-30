@@ -1,0 +1,36 @@
+{% macro row(c, has_views, show_region=True) -%}
+<tr class="ch" data-id="{{ c.id }}" data-type="{{ c.type }}" data-region="{{ c.region_slug }}" data-subs="{{ c.subs }}" data-views="{{ c.views if c.views is not none else '' }}" data-name="{{ c.name|lower }} {{ c.region|lower }}">
+  <td class="ch__main">
+    {% if c.ava %}<img class="ava" src="/assets/ava/{{ c.id }}.jpg" alt="" width="40" height="40" loading="lazy">{% else %}<span class="ava ava--{{ c.type }}" aria-hidden="true">{{ c.initials }}</span>{% endif %}
+    <span class="ch__txt">
+      <a class="ch__name" href="{{ c.max_url }}" target="_blank" rel="noopener nofollow">{{ c.name }}</a>
+      <span class="ch__meta"><span class="tag tag--{{ c.type }}">{{ c.type_label }}</span>{% if show_region %}<a class="ch__reg" href="/reklama/{{ c.region_slug }}/">{{ c.region }}</a>{% endif %}</span>
+    </span>
+  </td>
+  <td class="ch__num" data-label="Подписчики">{{ c.subs|num }}</td>
+  {% if has_views %}<td class="ch__num ch__num--muted" data-label="Просмотры за 24 ч">{{ c.views|num }}</td>{% endif %}
+  <td class="ch__act">
+    <button class="add" type="button" data-add="{{ c.id }}" aria-pressed="false" aria-label="Добавить «{{ c.name }}» в подборку">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path class="add__plus" d="M10 4v12M4 10h12"/><path class="add__ok" d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>
+    </button>
+  </td>
+</tr>
+{%- endmacro %}
+
+{% macro table(list, has_views, show_region=True, id=None) -%}
+<div class="tbl-wrap">
+<table class="tbl"{% if id %} id="{{ id }}"{% endif %}>
+  <thead>
+    <tr>
+      <th scope="col">Канал</th>
+      <th scope="col" class="ch__num">Подписчики</th>
+      {% if has_views %}<th scope="col" class="ch__num">Просмотры за 24 ч</th>{% endif %}
+      <th scope="col" class="ch__act"><span class="sr">Подборка</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in list %}{{ row(c, has_views, show_region) }}{% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}

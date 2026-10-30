@@ -1,0 +1,51 @@
+<div class="pickbar" data-pickbar hidden>
+  <div class="pickbar__txt"><b data-pick-count>0</b> <span data-pick-word>каналов</span>, <span data-pick-subs>0</span> подписок</div>
+  <button class="btn btn--blue" type="button" data-open-pick>Открыть подборку</button>
+</div>
+
+<aside class="drawer" id="pick" data-drawer aria-label="Моя подборка" hidden>
+  <div class="drawer__head">
+    <h2 class="drawer__h">Моя подборка</h2>
+    <button class="x" type="button" data-close-pick aria-label="Закрыть подборку">×</button>
+  </div>
+  <div class="drawer__empty" data-pick-empty>
+    <p>Подборка пустая.</p>
+    <p class="muted">Нажмите «+» рядом с каналом в каталоге, и он появится здесь.</p>
+  </div>
+  <ul class="drawer__list" data-pick-list></ul>
+  <div class="drawer__sum" data-pick-sum hidden>
+    <div class="sumrow"><span>Каналов</span><b data-pick-count>0</b></div>
+    <div class="sumrow"><span>Подписки суммарно</span><b data-pick-subs>0</b></div>
+    <div class="sumrow" data-pick-views-row><span>Просмотры за 24 ч</span><b data-pick-views>—</b></div>
+    <div class="sumrow"><span>Стоимость</span><b>по запросу</b></div>
+    <p class="muted small">Аудитория каналов может пересекаться, поэтому сумма подписок больше числа уникальных людей.</p>
+    <button class="btn btn--blue btn--wide" type="button" data-open-request>Оформить заявку</button>
+    <button class="linkbtn" type="button" data-clear-pick>Очистить подборку</button>
+  </div>
+</aside>
+<div class="scrim" data-scrim hidden></div>
+
+<dialog class="req" id="request" aria-labelledby="req-h">
+  <form method="dialog" class="req__in">
+    <div class="drawer__head">
+      <h2 class="drawer__h" id="req-h">Заявка на размещение</h2>
+      <button class="x" value="close" aria-label="Закрыть">×</button>
+    </div>
+    <p class="muted">Заполните детали, скопируйте готовый текст и отправьте его нам в MAX. Это запрос условий: дату, формат и стоимость подтвердим ответным сообщением.</p>
+    <div class="fields">
+      <label>Что рекламируете<input name="project" autocomplete="organization" placeholder="Например, сеть кофеен «Зерно»"></label>
+      <label>Желаемая дата<input name="date" placeholder="Например, 5–7 ноября"></label>
+      <label class="fields__full">Комментарий<textarea name="comment" rows="2" placeholder="Формат, количество постов, бюджет"></textarea></label>
+    </div>
+    <label class="fields__full">Текст заявки<textarea name="text" rows="8" readonly data-req-text></textarea></label>
+    <div class="req__btns">
+      <button class="btn btn--blue" type="button" data-copy-req>Скопировать заявку</button>
+      <a class="btn btn--line" href="{{ site.contact_url }}" target="_blank" rel="noopener">Открыть MAX</a>
+    </div>
+    <div class="req__more">
+      <button class="linkbtn" type="button" data-copy-link>Скопировать ссылку на подборку</button>
+      <button class="linkbtn" type="button" data-csv>Скачать список в CSV</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" role="status" aria-live="polite" data-toast></div>

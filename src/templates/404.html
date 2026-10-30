@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Страница не найдена — Новости в MAX{% endblock %}
+{% block description %}Такой страницы нет. Перейдите в каталог каналов MAX.{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block main %}
+<section class="hero hero--region">
+  <div class="wrap">
+    <h1 class="hero__h hero__h--region">Такой страницы нет</h1>
+    <p class="hero__lead">Возможно, ссылка устарела. Каналы и города — в каталоге.</p>
+    <div class="hero__cta"><a class="btn btn--blue btn--big" href="/#catalog">Открыть каталог</a><a class="btn btn--line btn--big" href="/reklama/">Города</a></div>
+  </div>
+</section>
+{% endblock %}

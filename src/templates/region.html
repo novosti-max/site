@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_row.html" import table %}
+{% set radars = page.channels|selectattr("type", "equalto", "radar")|list %}
+{% set cities = page.channels|selectattr("type", "equalto", "city")|list %}
+{% set media = page.channels|selectattr("type", "equalto", "media")|list %}
+{% block title %}{% if page.federal %}Реклама в федеральных каналах MAX по всей России{% else %}Реклама в MAX {{ page.prep }}: каналы, подписчики, цены{% endif %} — Новости в MAX{% endblock %}
+{% block description %}{% if page.federal %}Федеральные каналы MAX для рекламы по всей России: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}, {{ page.subs|short }} подписок.{% else %}Реклама в мессенджере MAX {{ page.prep }}: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}{% if radars %} — радары{% endif %}{% if cities %}{% if radars %} и{% else %} —{% endif %} городские новости{% endif %}, {{ page.subs|short }} подписок.{% endif %} Соберите подборку и запросите стоимость размещения.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Главная","item":"{{ site.domain }}/"},{"@type":"ListItem","position":2,"name":"Реклама по городам","item":"{{ site.domain }}/reklama/"},{"@type":"ListItem","position":3,"name":"{{ page.name }}","item":"{{ site.domain }}/reklama/{{ page.slug }}/"}]}</script>
+{% endblock %}
+{% block main %}
+<section class="hero hero--region">
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a> / <a href="/reklama/">Города</a> / <span>{{ page.name }}</span></nav>
+    <h1 class="hero__h hero__h--region">{% if page.federal %}Реклама в федеральных каналах MAX{% else %}Реклама в MAX {{ page.prep }}{% endif %}</h1>
+    <p class="hero__lead">
+      {% if page.federal %}
+        Каналы с аудиторией по всей стране: федеральные радары и новостные медиа. Подходят для брендов, которые работают во многих городах сразу.
+      {% else %}
+        В сети «Новости в MAX» {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }} с аудиторией {{ page.prep }}{% if radars %}: {{ radars|length }} {{ plural(radars|length, 'радар', 'радара', 'радаров') }} с оповещениями о БПЛА и тревогах{% endif %}{% if cities %}{% if radars %} и{% else %}:{% endif %} {{ cities|length }} {{ plural(cities|length, 'городской новостной канал', 'городских новостных канала', 'городских новостных каналов') }}{% endif %}{% if media %}{% if radars or cities %} и{% else %}:{% endif %} {{ media|length }} {{ plural(media|length, 'медиа', 'медиа', 'медиа') }}{% endif %}. Радары читают часто и быстро, городские каналы дают рекламе местный контекст.
+      {% endif %}
+    </p>
+    <dl class="facts facts--row">
+      <div><dt>Каналов</dt><dd>{{ page.count }}</dd></div>
+      <div><dt>Подписок суммарно</dt><dd>{{ page.subs|short }}</dd></div>
+      {% if page.views is not none %}<div><dt>Просмотров за 24 ч</dt><dd>{{ page.views|short }}</dd></div>{% endif %}
+    </dl>
+    <div class="hero__cta">
+      <button class="btn btn--blue btn--big" type="button" data-add-ids="{{ page.channels|map(attribute='id')|join(',') }}">Добавить {{ 'все каналы' if page.count > 1 else 'канал' }} в подборку</button>
+      <a class="btn btn--line btn--big" href="{{ site.contact_url }}" target="_blank" rel="noopener">Узнать цену в MAX</a>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="catalog">
+  <div class="wrap">
+    <h2 class="h2">Каналы {{ page.prep if not page.federal else 'по всей России' }}</h2>
+    {{ table(page.channels, page.views is not none, show_region=page.federal) }}
+    <p class="muted small note">Данные MaxFrame на {{ updated_human }}. Стоимость размещения сообщаем по запросу: она зависит от формата и даты.</p>
+
+    {% if not page.federal and federal_page %}
+    <div class="callout">
+      <div>
+        <h2 class="h3">Добавьте федеральный охват</h2>
+        <p>Федеральные радары и медиа сети читают и {{ page.prep }}: {{ federal_page.count }} {{ plural(federal_page.count, 'канал', 'канала', 'каналов') }}, {{ federal_page.subs|short }} подписок.</p>
+      </div>
+      <a class="btn btn--line" href="/reklama/{{ federal_page.slug }}/">Федеральные каналы</a>
+    </div>
+    {% endif %}
+
+    <h2 class="h2 h2--sm">Другие регионы</h2>
+    <ul class="chips">
+      {% for o in others %}<li><a href="/reklama/{{ o.slug }}/">{{ o.name }} <span>{{ o.subs|short }}</span></a></li>{% endfor %}
+      <li><a href="/reklama/">Все регионы</a></li>
+    </ul>
+  </div>
+</section>
+{% endblock %}
