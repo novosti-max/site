@@ -151,6 +151,10 @@ def build():
     (OUT / "assets").mkdir(parents=True)
     for f in (SRC / "static").iterdir():
         shutil.copy(f, OUT / "assets" / f.name)
+    # файлы, которые должны лежать в корне сайта (подтверждения Яндекса/Google и т.п.)
+    if (SRC / "root").exists():
+        for f in (SRC / "root").iterdir():
+            shutil.copy(f, OUT / f.name)
     if (DATA / "ava").exists():
         shutil.copytree(DATA / "ava", OUT / "assets" / "ava")
 
