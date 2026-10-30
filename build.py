@@ -66,6 +66,9 @@ def initials(name):
 
 def load():
     site = json.loads((DATA / "site.json").read_text("utf-8"))
+    # на сервере с выданным сертификатом все ссылки сайта — на https
+    if Path("/etc/ssl/novosti-max/fullchain.pem").exists():
+        site["domain"] = site["domain"].replace("http://", "https://")
     regions = {k: v for k, v in json.loads((DATA / "regions.json").read_text("utf-8")).items() if not k.startswith("_")}
     stats_path = DATA / "stats.json"
     stats = json.loads(stats_path.read_text("utf-8")) if stats_path.exists() else {}

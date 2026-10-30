@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# Установка сайта «Новости в MAX» на чистый Ubuntu-сервер. Запускать от root один раз:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/novosti-max/site/main/deploy/install.sh)
+# Установка сайта «Новости в MAX» на чистый Ubuntu-сервер. Запускать от root:
+#   curl -fsSL https://raw.githubusercontent.com/novosti-max/site/main/deploy/install.sh | bash
+# Почта для запасного HTTPS-сертификата (ZeroSSL) — один раз, хранится только на сервере:
+#   curl -fsSL https://raw.githubusercontent.com/novosti-max/site/main/deploy/install.sh | EMAIL=почта bash
 # Повторный запуск безопасен: обновит код, конфиг и пересоберёт сайт.
 set -euo pipefail
 
 REPO="${REPO:-https://github.com/novosti-max/site.git}"
-DOMAIN="${DOMAIN:-novosti-max.com}"
-EMAIL="${EMAIL:-}"          # почта для уведомлений Let's Encrypt (необязательно)
+export DOMAIN="${DOMAIN:-novosti-max.com}"
+export EMAIL="${EMAIL:-}"
 DIR=/opt/novosti-max
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -yq nginx git python3 python3-jinja2 certbot python3-certbot-nginx
+apt-get install -yq nginx git python3 python3-jinja2 curl socat
 
 # код
 if [ -d "$DIR/.git" ]; then
@@ -20,56 +22,28 @@ else
   git clone "$REPO" "$DIR"
 fi
 
-# первая сборка со свежими цифрами
+# свежие цифры из MaxFrame и сборка
 python3 "$DIR/update.py" || python3 "$DIR/build.py"
 
-# nginx
-cat > /etc/nginx/sites-available/novosti-max <<NGINX
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $DOMAIN www.$DOMAIN;
-    root $DIR/public;
-    index index.html;
-    charset utf-8;
+# nginx (http, а если сертификат уже есть — https)
+bash "$DIR/deploy/https.sh" nginx
 
-    location / { try_files \$uri \$uri/ =404; }
-    location /assets/ { expires 7d; add_header Cache-Control "public"; }
-    location = /assets/catalog.json { expires 1h; }
-    error_page 404 /404.html;
-
-    gzip on;
-    gzip_types text/css application/javascript application/json image/svg+xml text/xml application/xml;
-    add_header X-Content-Type-Options nosniff;
-}
-NGINX
-ln -sf /etc/nginx/sites-available/novosti-max /etc/nginx/sites-enabled/novosti-max
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
-
-# ежедневное обновление: 06:10 по Москве — подтянуть код, забрать цифры из MaxFrame, пересобрать
+# расписание
 timedatectl set-timezone Europe/Moscow || true
 cat > /etc/cron.d/novosti-max <<CRON
 SHELL=/bin/bash
+# 06:10 МСК — подтянуть код, забрать цифры из MaxFrame, пересобрать
 10 6 * * * root cd $DIR && git pull -q --ff-only; python3 $DIR/update.py >> /var/log/novosti-max.log 2>&1
 # правки сайта из GitHub подтягиваются в течение 10 минут
 */10 * * * * root bash $DIR/deploy/sync.sh >> /var/log/novosti-max.log 2>&1
-# HTTPS: пока сертификата нет, пробуем каждые 15 минут (ждём, когда DNS домена обновится)
-*/15 * * * * root [ -d /etc/letsencrypt/live/$DOMAIN ] || certbot --nginx -n --agree-tos --redirect --register-unsafely-without-email -d $DOMAIN -d www.$DOMAIN >> /var/log/novosti-max.log 2>&1
+# HTTPS: пока сертификата нет, пробуем каждые 15 минут (Let's Encrypt, при сбое ZeroSSL)
+*/15 * * * * root [ -s /etc/ssl/novosti-max/fullchain.pem ] || bash $DIR/deploy/https.sh >> /var/log/novosti-max.log 2>&1
 CRON
 chmod 644 /etc/cron.d/novosti-max
 
-# HTTPS — сработает, когда домен уже смотрит на этот сервер
-IP=$(curl -fsS4 https://ifconfig.me || hostname -I | awk '{print $1}')
-if getent hosts "$DOMAIN" | grep -q "$IP"; then
-  if [ -n "$EMAIL" ]; then MAILOPT=(-m "$EMAIL"); else MAILOPT=(--register-unsafely-without-email); fi
-  if certbot --nginx -n --agree-tos --redirect "${MAILOPT[@]}" -d "$DOMAIN" -d "www.$DOMAIN"; then
-    echo "HTTPS включён"
-  else
-    echo "HTTPS пока не получился, сервер повторит сам каждые 15 минут"
-  fi
+# HTTPS прямо сейчас
+if bash "$DIR/deploy/https.sh"; then
+  echo "Готово. Сайт: https://$DOMAIN"
 else
-  echo "Домен $DOMAIN ещё не указывает на $IP. HTTPS включится сам в течение 15 минут после обновления DNS."
+  echo "Готово. Сайт: http://$DOMAIN — HTTPS сервер включит сам, пробует каждые 15 минут. Лог: /var/log/novosti-max.log"
 fi
-
-echo "Готово. Сайт: http://$DOMAIN  (IP $IP). Лог обновлений: /var/log/novosti-max.log"
