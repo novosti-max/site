@@ -201,6 +201,13 @@ class Bot:
         self.state.d["quiet"][slug] = stamps + [now]
         return True
 
+    def remember_skip(self, source, text):
+        """Последние 30 отсеянных постов целиком — чтобы видеть, что именно не прошло (страница настройки)."""
+        sk = [x for x in self.state.d.setdefault("skipped", []) if x.get("text") != text]
+        sk.append({"t": dt.datetime.now(self.tz).strftime("%d.%m %H:%M"), "src": source, "text": text[:3000]})
+        self.state.d["skipped"] = sk[-30:]
+        self.state.save()
+
     def media_attachments(self, g, atts):
         """Фото из поста MAX -> фото во ВК (до 4 штук). Ошибка — пост уйдёт текстом."""
         if not self.rules.get("media", True) or self.dry:
@@ -240,6 +247,7 @@ class Bot:
             return
         if is_ad(text, url_buttons):
             log.info("пропуск: реклама в %s: %s", source, text[:60].replace("\n", " "))
+            self.remember_skip(source, text)
             return
         kind = classify(text)
         if kind == "news" and not self.rules.get("post_news", False):

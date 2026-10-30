@@ -157,6 +157,16 @@ def page(key, msg=""):
         tail = open(LOG_FILE, encoding="utf-8").read().splitlines()[-40:]
     except Exception:
         tail = ["журнал пока пуст"]
+    try:
+        st = json.load(open(os.path.join(os.path.dirname(LOG_FILE), "state.json"), encoding="utf-8"))
+        sk = st.get("skipped", [])[::-1]
+    except Exception:
+        sk = []
+    if sk:
+        out.append("<h2>Отсеяно как реклама (последние, одинаковые посты из разных каналов — один раз)</h2>")
+        for x in sk:
+            out.append(f"<div class=card><p class=small>{html.escape(x['t'])} · {html.escape(x['src'])}</p>"
+                       f"<pre style='background:#f6f7f9;color:#1b1f24'>{html.escape(x['text'])}</pre></div>")
     out.append("<h2>Журнал бота (последние строки)</h2><pre>" + html.escape("\n".join(tail)) + "</pre>")
     out.append("<p class=small>Обновите страницу, чтобы увидеть свежие записи.</p></main></body></html>")
     return "".join(out)
