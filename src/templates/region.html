@@ -4,8 +4,8 @@
 {% set radars = page.channels|selectattr("type", "equalto", "radar")|list %}
 {% set cities = page.channels|selectattr("type", "equalto", "city")|list %}
 {% set media = page.channels|selectattr("type", "equalto", "media")|list %}
-{% block title %}{% if page.federal %}Реклама в федеральных каналах MAX по всей России{% else %}Реклама в MAX {{ page.prep }}: каналы, подписчики, цены{% endif %} — Новости в MAX{% endblock %}
-{% block description %}{% if page.federal %}Федеральные каналы MAX для рекламы по всей России: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}, {{ page.subs|short }} подписок.{% else %}Реклама в мессенджере MAX {{ page.prep }}: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}{% if radars %} — радары{% endif %}{% if cities %}{% if radars %} и{% else %} —{% endif %} городские новости{% endif %}, {{ page.subs|short }} подписок.{% endif %} Соберите подборку и запросите стоимость размещения.{% endblock %}
+{% block title %}{% if page.federal %}Реклама в федеральных каналах MAX по всей России{% else %}Реклама в каналах MAX {{ page.prep }}: купить рекламу в Макс, цены{% endif %} — Новости в MAX{% endblock %}
+{% block description %}{% if page.federal %}Федеральные каналы MAX для рекламы по всей России: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}, {{ page.subs|short }} подписок.{% else %}Реклама в мессенджере MAX {{ page.prep }}: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}{% if radars %} — радары{% endif %}{% if cities %}{% if radars %} и{% else %} —{% endif %} городские новости{% endif %}, {{ page.subs|short }} подписок.{% endif %} Купить рекламу в каналах Макс: соберите подборку и запросите цену.{% endblock %}
 {% block head %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Главная","item":"{{ site.domain }}/"},{"@type":"ListItem","position":2,"name":"Реклама по городам","item":"{{ site.domain }}/reklama/"},{"@type":"ListItem","position":3,"name":"{{ page.name }}","item":"{{ site.domain }}/reklama/{{ page.slug }}/"}]}</script>
 {% endblock %}
@@ -13,12 +13,12 @@
 <section class="hero hero--region">
   <div class="wrap">
     <nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a> / <a href="/reklama/">Города</a> / <span>{{ page.name }}</span></nav>
-    <h1 class="hero__h hero__h--region">{% if page.federal %}Реклама в федеральных каналах MAX{% else %}Реклама в MAX {{ page.prep }}{% endif %}</h1>
+    <h1 class="hero__h hero__h--region">{% if page.federal %}Реклама в федеральных каналах MAX{% else %}Реклама в каналах MAX {{ page.prep }}{% endif %}</h1>
     <p class="hero__lead">
       {% if page.federal %}
         Каналы с аудиторией по всей стране: федеральные радары и новостные медиа. Подходят для брендов, которые работают во многих городах сразу.
       {% else %}
-        В сети «Новости в MAX» {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }} с аудиторией {{ page.prep }}{% if radars %}: {{ radars|length }} {{ plural(radars|length, 'радар', 'радара', 'радаров') }} с оповещениями о БПЛА и тревогах{% endif %}{% if cities %}{% if radars %} и{% else %}:{% endif %} {{ cities|length }} {{ plural(cities|length, 'городской новостной канал', 'городских новостных канала', 'городских новостных каналов') }}{% endif %}{% if media %}{% if radars or cities %} и{% else %}:{% endif %} {{ media|length }} {{ plural(media|length, 'медиа', 'медиа', 'медиа') }}{% endif %}. Радары читают часто и быстро, городские каналы дают рекламе местный контекст.
+        В сети «Новости в MAX» {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }} с аудиторией {{ page.prep }}{% if radars %}: {{ radars|length }} {{ plural(radars|length, 'радар', 'радара', 'радаров') }} с оповещениями о БПЛА и тревогах{% endif %}{% if cities %}{% if radars %} и{% else %}:{% endif %} {{ cities|length }} {{ plural(cities|length, 'городской новостной канал', 'городских новостных канала', 'городских новостных каналов') }}{% endif %}{% if media %}{% if radars or cities %} и{% else %}:{% endif %} {{ media|length }} {{ plural(media|length, 'медиа', 'медиа', 'медиа') }}{% endif %}. Радары читают часто и быстро, городские каналы дают рекламе местный контекст. Купить рекламу в каналах Макс {{ page.prep }} можно отдельно по каждому каналу или пакетом вместе с федеральными.
       {% endif %}
     </p>
     <dl class="facts facts--row">
@@ -36,7 +36,7 @@
 
 <section class="sec" id="catalog">
   <div class="wrap">
-    <h2 class="h2">Каналы {{ page.prep if not page.federal else 'по всей России' }}</h2>
+    <h2 class="h2">Каналы MAX {{ page.prep if not page.federal else 'по всей России' }}</h2>
     {{ table(page.channels, page.views is not none, show_region=page.federal) }}
     <p class="muted small note">Данные MaxFrame на {{ updated_human }}. Стоимость размещения сообщаем по запросу: она зависит от формата и даты.</p>
 
