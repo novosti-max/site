@@ -119,6 +119,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tbl-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{text-align:left;font-size:13px;font-weight:600;color:var(--muted);padding:12px 18px;border-bottom:1px solid var(--line);background:#fafbfd}
+.tbl th.ch__num{text-align:right}
 .tbl td{padding:12px 18px;border-top:1px solid #edf0f5;vertical-align:middle}
 .tbl tbody tr:first-child td{border-top:0}
 .tbl tr.ch:hover{background:#f8f9fd}
