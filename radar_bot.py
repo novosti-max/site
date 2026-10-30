@@ -11,7 +11,7 @@ import argparse, datetime as dt, json, logging, logging.handlers, os, sys, time
 import requests, yaml
 from zoneinfo import ZoneInfo
 
-from textproc import clean_text, classify, card_kind, is_ad, matches_filter
+from textproc import clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
@@ -271,8 +271,11 @@ class Bot:
                 for it in items:
                     if time.time() - it.get("date", 0) > 86400:
                         continue
-                    new = clean_text(it.get("text") or "")
-                    if new and new != (it.get("text") or "").strip():
+                    old = it.get("text") or ""
+                    if it.get("is_pinned") or not DANGLING_SIGN.search(old) or "http" in old or "max.ru" in old:
+                        continue          # трогаем только посты бота с хвостом «Радар … -», закреп и посты со ссылками — нет
+                    new = DANGLING_SIGN.sub("", old).strip()
+                    if new and new != old.strip():
                         att = ",".join(f"{a['type']}{a[a['type']]['owner_id']}_{a[a['type']]['id']}"
                                        for a in it.get("attachments", []) if a.get("type") == "photo")
                         vk_call("wall.edit", self.token(g), owner_id=-int(g["gid"]), post_id=it["id"], message=new,
