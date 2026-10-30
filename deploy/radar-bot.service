@@ -1,0 +1,19 @@
+[Unit]
+Description=Радар: посты из MAX-каналов в группы ВК
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=radarbot
+WorkingDirectory=/opt/radar-bot
+ExecStart=/usr/bin/python3 /opt/radar-bot/radar_bot.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/radar-bot
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

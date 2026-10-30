@@ -1,0 +1,18 @@
+[Unit]
+Description=Радар: страница настройки ключей
+After=network-online.target
+
+[Service]
+User=radarbot
+WorkingDirectory=/opt/radar-bot
+ExecStart=/usr/bin/python3 /opt/radar-bot/setup_server.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/etc/radar-bot /var/lib/radar-bot
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
