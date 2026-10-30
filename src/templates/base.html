@@ -59,7 +59,7 @@
         <p class="foot__note">{{ site.network }}. {{ totals.count }} {{ plural(totals.count, 'канал', 'канала', 'каналов') }} в MAX: радары, городские новости и федеральные медиа.</p>
         <p class="foot__note">Цифры обновляются каждый день по данным <a href="{{ site.maxframe_group }}" rel="nofollow noopener" target="_blank">MaxFrame</a>. Последнее обновление: {{ updated_human }}.</p>
         <ul class="foot__contacts">
-          <li>{{ site.contacts.name }}, {{ site.contacts.role|lower }}</li>
+          <li>{{ site.contacts.name }}: {{ site.contacts.role|lower }}</li>
           {% if site.contacts.max %}<li><a href="{{ site.contacts.max }}" target="_blank" rel="noopener">MAX</a></li>{% endif %}
           {% if site.contacts.telegram %}<li><a href="https://t.me/{{ site.contacts.telegram.rstrip('/').split('/')[-1].lstrip('@') }}" target="_blank" rel="noopener">Telegram @{{ site.contacts.telegram.rstrip('/').split('/')[-1].lstrip('@') }}</a></li>{% endif %}
           {% if site.contacts.email %}<li><a href="mailto:{{ site.contacts.email }}">{{ site.contacts.email }}</a></li>{% endif %}
