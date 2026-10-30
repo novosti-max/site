@@ -15,7 +15,7 @@ apt-get install -yq nginx git python3 python3-jinja2 certbot python3-certbot-ngi
 
 # код
 if [ -d "$DIR/.git" ]; then
-  git -C "$DIR" pull --ff-only
+  git -C "$DIR" fetch -q origin main && git -C "$DIR" reset -q --hard origin/main
 else
   git clone "$REPO" "$DIR"
 fi
@@ -52,6 +52,8 @@ timedatectl set-timezone Europe/Moscow || true
 cat > /etc/cron.d/novosti-max <<CRON
 SHELL=/bin/bash
 10 6 * * * root cd $DIR && git pull -q --ff-only; python3 $DIR/update.py >> /var/log/novosti-max.log 2>&1
+# правки сайта из GitHub подтягиваются в течение 10 минут
+*/10 * * * * root bash $DIR/deploy/sync.sh >> /var/log/novosti-max.log 2>&1
 # HTTPS: пока сертификата нет, пробуем каждые 15 минут (ждём, когда DNS домена обновится)
 */15 * * * * root [ -d /etc/letsencrypt/live/$DOMAIN ] || certbot --nginx -n --agree-tos --redirect --register-unsafely-without-email -d $DOMAIN -d www.$DOMAIN >> /var/log/novosti-max.log 2>&1
 CRON
