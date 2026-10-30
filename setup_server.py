@@ -60,18 +60,30 @@ def check_max(token):
         if me.status_code != 200:
             return False, f"MAX не принял токен (код {me.status_code})", []
         me = me.json()
-        chats, marker = [], None
-        while True:
-            params = {"count": 100}
-            if marker:
-                params["marker"] = marker
-            r = requests.get(MAX_API + "/chats", headers=h, params=params, timeout=20).json()
-            chats += r.get("chats", [])
-            marker = r.get("marker")
-            if not marker:
-                break
+        links = set()
+        try:
+            marker = None
+            while True:
+                params = {"count": 100}
+                if marker:
+                    params["marker"] = marker
+                r = requests.get(MAX_API + "/chats", headers=h, params=params, timeout=20)
+                if r.status_code != 200:
+                    break
+                r = r.json()
+                links |= {norm(c.get("link")) for c in r.get("chats", []) if c.get("link")}
+                marker = r.get("marker")
+                if not marker:
+                    break
+        except Exception:
+            pass
+        for g in cfg()["groups"]:
+            if g.get("enabled") and norm(g["source"]) not in links:
+                r = requests.get(MAX_API + "/chats/" + norm(g["source"]).split("/", 1)[-1], headers=h, timeout=15)
+                if r.status_code == 200 and r.json().get("chat_id"):
+                    links.add(norm(g["source"]))
         name = me.get("name") or me.get("first_name") or "бот"
-        return True, f"{name} (@{me.get('username', '')})", [norm(c.get("link")) for c in chats if c.get("link")]
+        return True, f"{name} (@{me.get('username', '')})", links
     except Exception as e:
         return False, f"не удалось проверить: {e}", []
 

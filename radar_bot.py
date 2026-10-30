@@ -102,6 +102,12 @@ class MAX:
             if not marker:
                 return out
 
+    def chat_by_link(self, link):
+        """Канал по публичной ссылке max.ru/<ник> — работает, только если бот в нём админ."""
+        nick = norm_link(link).split("/", 1)[-1]
+        r = self.s.get(MAX_API + "/chats/" + nick, timeout=20)
+        return r.json() if r.status_code == 200 else None
+
     def updates(self, marker):
         params = {"timeout": 30, "limit": 100, "types": "message_created"}
         if marker is not None:
@@ -136,17 +142,23 @@ class Bot:
 
     # --- подготовка
     def resolve_chats(self):
+        found = {}
         try:
-            chats = self.max.chats()
+            for c in self.max.chats():
+                link = norm_link(c.get("link") or "")
+                if link:
+                    found[c.get("chat_id")] = link
         except Exception as e:
-            log.error("не удалось получить список каналов MAX: %s", e)
-            return
-        self.chat_to_source = {}
-        for c in chats:
-            link = norm_link(c.get("link") or "")
-            if link:
-                self.chat_to_source[c.get("chat_id")] = link
+            log.info("общий список каналов MAX недоступен (%s), ищу каналы по ссылкам", e)
         wanted = {norm_link(g["source"]) for g in self.groups}
+        for link in wanted - set(found.values()):
+            try:
+                c = self.max.chat_by_link(link)
+                if c and c.get("chat_id"):
+                    found[c["chat_id"]] = link
+            except Exception as e:
+                log.warning("канал %s: %s", link, e)
+        self.chat_to_source = found
         missing = wanted - set(self.chat_to_source.values())
         if missing:
             log.warning("бот не админ в этих каналах (посты оттуда не придут): %s", ", ".join(sorted(missing)))
