@@ -54,6 +54,7 @@ class State:
         self.d.setdefault("quiet", {})      # slug -> [timestamps]
         self.d.setdefault("seen", [])       # последние id сообщений MAX, чтобы не дублировать
         self.d.setdefault("promo", {})      # slug -> "2026-10-29"
+        self.d.setdefault("cards", {})      # slug -> {вид карточки: время} — чтобы не вешать картинку на каждый пост серии
         self.d.setdefault("chats", {})      # chat_id (строкой) -> ссылка канала; узнаём из событий MAX
 
     def save(self):
@@ -176,7 +177,8 @@ class Bot:
         if attachment:
             params["attachments"] = attachment
         res = vk_call("wall.post", self.token(g), **params)
-        log.info("опубликовано в %s (пост %s)", g["vk"], res.get("post_id"))
+        log.info("опубликовано в %s (пост %s)%s: %s", g["vk"], res.get("post_id"), " с карточкой" if attachment else "",
+                 text.replace("\n", " / ")[:90])
 
     def quiet_allowed(self, slug):
         now = time.time()
@@ -225,7 +227,13 @@ class Bot:
                 continue
             try:
                 ck = card_kind(kind, text)
-                att = (g.get("cards") or {}).get(ck) if ck else None
+                att = None
+                if ck:
+                    used = self.state.d["cards"].setdefault(g["slug"], {})
+                    gap = float(self.rules.get("card_gap_minutes", 45)) * 60
+                    if time.time() - used.get(ck, 0) >= gap:   # карточка только у первого поста серии
+                        att = (g.get("cards") or {}).get(ck)
+                        used[ck] = time.time()
                 self.post(g, clean, att)
             except Exception as e:
                 log.error("ошибка публикации в %s: %s", g["vk"], e)

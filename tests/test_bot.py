@@ -114,6 +114,8 @@ def test_bot_flow():
     assert sorted(s for s, _, _ in posted) == ["chuvashiya", "russia"], posted
     assert all(att and att.startswith("photo-") for _, _, att in posted)
 
+    posted.clear(); b.handle(msg(1, PLUS, "m1b"))          # второй пост серии — уже без карточки
+    assert posted and all(att is None for _, _, att in posted), posted
     posted.clear(); b.handle(msg(1, PLUS, "m1"))          # дубль
     assert posted == []
     b.handle(msg(2, AD1, "m2")); b.handle(msg(3, SAMARA_DANGER, "m3"))
