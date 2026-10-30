@@ -57,6 +57,9 @@ def test_card_kinds():
 
 
 def test_clean():
+    assert clean_text("Белгородская область\nРакетная опасность!\n\n❗️Радар ПЛЮС 24/7 -") == "Белгородская область\nРакетная опасность!"
+    assert clean_text("✅Отбой!\n\n❗️Радар ПЛЮС 24/7 - ") == "✅Отбой!"
+    assert clean_text("Кремль заявил:\n- Украина продолжает удары") == "Кремль заявил:\n- Украина продолжает удары"
     assert clean_text(MOSCOW) == "Раменский МО\nРабота ПВО"
     assert "Подписаться" not in clean_text(SAMARA_DANGER)
     assert "max.ru" not in clean_text("Текст\nНаш канал в MAX — max.ru/club7174")
