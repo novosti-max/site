@@ -60,7 +60,8 @@ chmod 644 /etc/cron.d/novosti-max
 # HTTPS — сработает, когда домен уже смотрит на этот сервер
 IP=$(curl -fsS4 https://ifconfig.me || hostname -I | awk '{print $1}')
 if getent hosts "$DOMAIN" | grep -q "$IP"; then
-  certbot --nginx -n --agree-tos --redirect ${EMAIL:+-m "$EMAIL"} ${EMAIL:---register-unsafely-without-email} -d "$DOMAIN" -d "www.$DOMAIN" || true
+  if [ -n "$EMAIL" ]; then MAILOPT=(-m "$EMAIL"); else MAILOPT=(--register-unsafely-without-email); fi
+  certbot --nginx -n --agree-tos --redirect "${MAILOPT[@]}" -d "$DOMAIN" -d "www.$DOMAIN" || true
   echo "HTTPS включён"
 else
   echo "Домен $DOMAIN ещё не указывает на $IP. HTTPS включится сам в течение 15 минут после обновления DNS."
