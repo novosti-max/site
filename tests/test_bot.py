@@ -127,8 +127,13 @@ def test_bot_flow():
     posted.clear()
     b.handle(msg(2, SAMARA_DANGER, "f1", link={"type": "forward"}))
     assert posted == []                                   # репосты пропускаем
+    b.rules["post_news"] = False
     b.handle(msg(2, REAL[3][0], "n1"))
-    assert posted == []                                   # политика из радара в ВК не идёт
+    assert posted == []                                   # при post_news: false политика не идёт
+    b.rules["post_news"] = True
+    b.handle(msg(2, REAL[3][0], "n2"))
+    assert posted[-1][2] is None and "Подписаться" not in posted[-1][1]   # при true — идёт без карточки
+    posted.clear()
     b.handle(msg(2, REAL[6][0], "t1"))
     assert posted[-1][0] == "samara" and posted[-1][2] is None   # аэропорт — без карточки
 
