@@ -100,7 +100,9 @@ def test_bot_flow():
     b = radar_bot.Bot(cfg, secrets, dry=True)
     posted = []
     b.post = lambda g, text, att=None: posted.append((g["slug"], text, att))
-    b.chat_to_source = {1: "max.ru/channel_radar_plus_bpla", 2: "max.ru/club7174", 3: "max.ru/stranger"}
+    b.chat_to_source = {1: "max.ru/channel_radar_plus_bpla", 2: "max.ru/club7174"}
+    b.max.chat = lambda cid: {3: {"link": "https://max.ru/stranger", "title": "чужой"},
+                              5: {"link": "https://max.ru/channel_radar_msk", "title": "Подмосковье"}}.get(cid)
 
     def msg(chat, text, mid, **extra):
         m = {"recipient": {"chat_id": chat, "chat_type": "channel"}, "body": {"mid": mid, "text": text}}
@@ -129,6 +131,12 @@ def test_bot_flow():
     assert posted == []                                   # политика из радара в ВК не идёт
     b.handle(msg(2, REAL[6][0], "t1"))
     assert posted[-1][0] == "samara" and posted[-1][2] is None   # аэропорт — без карточки
+
+    # канал, которого бот ещё не знал: узнаёт по первому посту и запоминает
+    posted.clear()
+    b.handle(msg(5, MOSCOW, "p1"))
+    assert posted and posted[-1][0] == "podmoskovie", posted
+    assert b.state.d["chats"]["5"] == "max.ru/channel_radar_msk" and b.state.d["chats"]["3"] == "max.ru/stranger"
 
     # группа без ключа не работает
     b2 = radar_bot.Bot(cfg, {"max_token": "x", "vk": {"samara": "k"}}, dry=True)

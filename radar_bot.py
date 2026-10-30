@@ -54,6 +54,7 @@ class State:
         self.d.setdefault("quiet", {})      # slug -> [timestamps]
         self.d.setdefault("seen", [])       # последние id сообщений MAX, чтобы не дублировать
         self.d.setdefault("promo", {})      # slug -> "2026-10-29"
+        self.d.setdefault("chats", {})      # chat_id (строкой) -> ссылка канала; узнаём из событий MAX
 
     def save(self):
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
@@ -102,14 +103,12 @@ class MAX:
             if not marker:
                 return out
 
-    def chat_by_link(self, link):
-        """Канал по публичной ссылке max.ru/<ник> — работает, только если бот в нём админ."""
-        nick = norm_link(link).split("/", 1)[-1]
-        r = self.s.get(MAX_API + "/chats/" + nick, timeout=20)
+    def chat(self, chat_id):
+        r = self.s.get(f"{MAX_API}/chats/{chat_id}", timeout=20)
         return r.json() if r.status_code == 200 else None
 
     def updates(self, marker):
-        params = {"timeout": 30, "limit": 100, "types": "message_created"}
+        params = {"timeout": 30, "limit": 100, "types": "message_created,bot_added"}
         if marker is not None:
             params["marker"] = marker
         r = self.s.get(MAX_API + "/updates", params=params, timeout=45)
@@ -142,26 +141,31 @@ class Bot:
 
     # --- подготовка
     def resolve_chats(self):
-        found = {}
-        try:
-            for c in self.max.chats():
-                link = norm_link(c.get("link") or "")
-                if link:
-                    found[c.get("chat_id")] = link
-        except Exception as e:
-            log.info("общий список каналов MAX недоступен (%s), ищу каналы по ссылкам", e)
+        """Списка каналов у MAX API нет: chat_id канала узнаём из событий (бот добавлен / новый пост)
+        и запоминаем. Здесь только подхватываем уже известные."""
+        self.chat_to_source = {int(k): v for k, v in self.state.d["chats"].items() if v}
         wanted = {norm_link(g["source"]) for g in self.groups}
-        for link in wanted - set(found.values()):
-            try:
-                c = self.max.chat_by_link(link)
-                if c and c.get("chat_id"):
-                    found[c["chat_id"]] = link
-            except Exception as e:
-                log.warning("канал %s: %s", link, e)
-        self.chat_to_source = found
         missing = wanted - set(self.chat_to_source.values())
         if missing:
-            log.warning("бот не админ в этих каналах (посты оттуда не придут): %s", ", ".join(sorted(missing)))
+            log.info("каналы, где бот ещё не видел постов (появятся с первым постом): %s", ", ".join(sorted(missing)))
+
+    def learn_chat(self, chat_id):
+        """Неизвестный chat_id — спрашиваем у MAX ссылку канала и запоминаем."""
+        if chat_id is None or str(chat_id) in self.state.d["chats"]:
+            return self.chat_to_source.get(chat_id)
+        link = ""
+        try:
+            c = self.max.chat(chat_id) or {}
+            link = norm_link(c.get("link") or "")
+            log.info("новый канал: %s (%s)", c.get("title"), link or "без ссылки")
+        except Exception as e:
+            log.warning("не узнал канал %s: %s", chat_id, e)
+            return None
+        self.state.d["chats"][str(chat_id)] = link
+        self.state.save()
+        if link:
+            self.chat_to_source[chat_id] = link
+        return link or None
 
     # --- публикация
     def post(self, g, text, attachment=None):
@@ -191,7 +195,7 @@ class Bot:
         mid = body.get("mid")
         if mid and mid in self.state.d["seen"]:
             return
-        source = self.chat_to_source.get(rec.get("chat_id"))
+        source = self.chat_to_source.get(rec.get("chat_id")) or self.learn_chat(rec.get("chat_id"))
         targets = [g for g in self.groups if source and norm_link(g["source"]) == source]
         if not targets:
             return
@@ -252,7 +256,6 @@ class Bot:
     def run(self):
         self.resolve_chats()
         log.info("старт: %d групп, %d каналов видно%s", len(self.groups), len(self.chat_to_source), " (ПРОБНЫЙ РЕЖИМ)" if self.dry else "")
-        last_chats = time.time()
         secrets_mtime = os.path.getmtime(SECRETS_FILE) if os.path.exists(SECRETS_FILE) else 0
         while True:
             if os.path.exists(SECRETS_FILE) and os.path.getmtime(SECRETS_FILE) != secrets_mtime:
@@ -263,13 +266,12 @@ class Bot:
                 for u in r.get("updates", []):
                     if u.get("update_type") == "message_created":
                         self.handle(u.get("message") or {})
+                    elif u.get("update_type") == "bot_added":
+                        self.learn_chat(u.get("chat_id"))
                 if r.get("marker") is not None:
                     self.state.d["marker"] = r["marker"]
                     self.state.save()
                 self.promo()
-                if time.time() - last_chats > 600:   # раз в 10 минут — на случай, если бота добавили в новые каналы
-                    self.resolve_chats()
-                    last_chats = time.time()
             except requests.RequestException as e:
                 log.warning("сеть: %s, повтор через 5 с", e)
                 time.sleep(5)

@@ -60,28 +60,11 @@ def check_max(token):
         if me.status_code != 200:
             return False, f"MAX не принял токен (код {me.status_code})", []
         me = me.json()
-        links = set()
-        try:
-            marker = None
-            while True:
-                params = {"count": 100}
-                if marker:
-                    params["marker"] = marker
-                r = requests.get(MAX_API + "/chats", headers=h, params=params, timeout=20)
-                if r.status_code != 200:
-                    break
-                r = r.json()
-                links |= {norm(c.get("link")) for c in r.get("chats", []) if c.get("link")}
-                marker = r.get("marker")
-                if not marker:
-                    break
+        try:   # каналы, которые бот уже узнал по событиям (см. radar_bot.learn_chat)
+            st = json.load(open(os.path.join(os.path.dirname(LOG_FILE), "state.json"), encoding="utf-8"))
+            links = {v for v in st.get("chats", {}).values() if v}
         except Exception:
-            pass
-        for g in cfg()["groups"]:
-            if g.get("enabled") and norm(g["source"]) not in links:
-                r = requests.get(MAX_API + "/chats/" + norm(g["source"]).split("/", 1)[-1], headers=h, timeout=15)
-                if r.status_code == 200 and r.json().get("chat_id"):
-                    links.add(norm(g["source"]))
+            links = set()
         name = me.get("name") or me.get("first_name") or "бот"
         return True, f"{name} (@{me.get('username', '')})", links
     except Exception as e:
@@ -164,7 +147,7 @@ def page(key, msg=""):
                    f"<a href='https://vk.com/club{g['gid']}?act=tokens' target=_blank rel=noopener>создать ключ ↗</a></div>"
                    f"<input type=password name='vk_{g['slug']}' autocomplete=off placeholder='{'задан' if vkkeys.get(g['slug']) else 'вставьте ключ группы'}'>"
                    f"<p class=small>{mark(ok)} ВК: {html.escape(text)} &nbsp; {mark(seen if mok else None)} "
-                   f"MAX-канал {html.escape(g['source'])}: {'бот видит канал' if seen else 'бот не админ в канале' if mok else 'проверю после токена'}</p>"
+                   f"MAX-канал {html.escape(g['source'])}: {'бот видит канал' if seen else 'появится после первого поста в канале (бот должен быть админом)' if mok else 'проверю после токена'}</p>"
                    + "</div>")
     dry = s.get("dry_run", False)
     out.append(f"<h2>3. Режим</h2><div class=card><label><input type=checkbox name=dry_run {'checked' if dry else ''}> "

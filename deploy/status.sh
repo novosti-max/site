@@ -9,8 +9,6 @@ OUT=/var/www/acme/.well-known/acme-challenge/rb-status.txt
   echo "keys: max=$(python3 -c "import json;d=json.load(open('/etc/radar-bot/secrets.json'));print('да' if d.get('max_token') else 'нет', 'vk=%d' % len(d.get('vk',{})), 'пробный' if d.get('dry_run') else 'боевой')" 2>/dev/null)"
   echo ---
   tail -n 60 /var/lib/radar-bot/bot.log 2>/dev/null
-  echo --- diag
-  timeout 60 python3 /opt/radar-bot/deploy/diag.py 2>&1 | head -20
   echo --- journal
   journalctl -u radar-bot -n 25 --no-pager -o cat 2>/dev/null | grep -v -i token
   echo --- install
