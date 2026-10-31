@@ -227,7 +227,9 @@ def card_decision(group_state: dict, ck, now: float, rules: dict, text: str = ""
     gap = float(rules.get("card_gap_minutes", 45)) * 60
     min_iv = float(rules.get("card_min_interval_minutes", 15)) * 60
     since = now - last_t
-    ok = since >= gap or (ck != last and since >= min_iv)
+    is_clear = lambda k: bool(k) and k.endswith("clear")
+    # отбой после тревоги — всегда с зелёной карточкой (31.10 15:10 Рязань: отбой через 14 мин после опасности вышел без неё)
+    ok = since >= gap or (ck != last and (since >= min_iv or (is_clear(ck) and not is_clear(last))))
     group_state["_last"] = ck            # вид серии запоминаем и без карточки, чтобы её не «догнала» карточка позже
     if ok:
         group_state["_t"] = now
