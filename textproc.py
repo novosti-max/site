@@ -7,6 +7,7 @@ FIX-3  region_ok(): в региональную группу не идут по�
 FIX-4  card_decision(): одна серия оповещений — одна карточка (раньше таймер был у каждого вида карточки).
 FIX-5  carry_source_photos(): картинки-плашки оповещений из MAX в ВК не переносятся.
 FIX-6  complete_alert(): «🔴Республика Татарстан» → дописываем «Опасность по БПЛА»; «✅ Регион» — это отбой.
+FIX-7  Памятки («🚨План действий при угрозе удара БПЛА», «что делать», «правила поведения») идут без карточки.
 """
 import re
 
@@ -174,6 +175,10 @@ AFTERMATH = re.compile(r"(погиб|пострадал|ранен|соболе�
 ALERT = re.compile(rf"({OPAS}|угроз|тревог|сирен|меры безопасности|фиксаци|пролёт|пролет|на подлёте|на подлете|работ\w* пво|отбой)", re.IGNORECASE)
 
 
+# FIX-7: памятки и инструкции — не оповещение, карточка «Опасность» на них не нужна
+MEMO = re.compile(r"(план действий|памятк|что делать|как действовать|правила поведени|рекомендаци\w* (?:при|для)|алгоритм действий)", re.IGNORECASE)
+
+
 def card_kind(kind: str, text: str):
     """Какую карточку приложить: None — пост без карточки.
     Карточка только у коротких постов-оповещений; длинная новость о последствиях идёт без карточки."""
@@ -182,6 +187,8 @@ def card_kind(kind: str, text: str):
     if kind not in ("danger", "clear"):
         return None
     body = clean_text(text)
+    if MEMO.search(body):
+        return None
     if AFTERMATH.search(body) or (len(body) > 450 and not DANGER_MARK.search(text or "")) or not (ALERT.search(body) or DANGER_MARK.search(text or "") or CLEAR_MARK.search(text or "") or CHECK_MARK.search(text or "")):
         return None
     th = threat(text)
