@@ -11,7 +11,8 @@ import argparse, datetime as dt, json, logging, logging.handlers, os, sys, time
 import requests, yaml
 from zoneinfo import ZoneInfo
 
-from textproc import clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN
+from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
+                      region_ok, card_decision, carry_source_photos, complete_alert)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
@@ -269,28 +270,31 @@ class Bot:
         for g in targets:
             if not matches_filter(full, g.get("filter")):
                 continue
+            # пост без своего региона, но с чужой географией (Одесса, Киев, Германия…) в региональную группу не идёт
+            if not region_ok(full, g):
+                log.info("пропуск: не про регион %s: %s", g["vk"], clean[:60].replace("\n", " "))
+                continue
             if kind == "quiet" and not self.quiet_allowed(g["slug"]):
                 log.info("пропуск «тихо» для %s (лимит)", g["vk"])
                 continue
             try:
+                text_vk = complete_alert(kind, clean, full)   # «🔴Республика Татарстан» -> + «Опасность по БПЛА»
                 ck = card_kind(kind, full)
                 att = None
-                if ck:
+                if ck and (g.get("cards") or {}).get(ck):
                     used = self.state.d["cards"].setdefault(g["slug"], {})
-                    gap = float(self.rules.get("card_gap_minutes", 45)) * 60
-                    if time.time() - used.get(ck, 0) >= gap:   # карточка только у первого поста серии
-                        att = (g.get("cards") or {}).get(ck)
-                        used[ck] = time.time()
-                if not att:                                    # нет карточки — берём фото из самого поста
+                    if card_decision(used, ck, time.time(), self.rules):   # одна серия оповещений — одна карточка
+                        att = g["cards"][ck]
+                if not att and carry_source_photos(kind, self.rules):     # плашки «Опасность» из MAX не переносим
                     photos = self.media_attachments(g, atts)
                     if photos:
                         try:
-                            self.post(g, clean, ",".join(photos))
+                            self.post(g, text_vk, ",".join(photos))
                             continue
                         except Exception as e:
                             log.warning("пост с фото в %s не прошёл (%s) — фото для этой группы отключаю, публикую текстом", g["vk"], e)
                             self.state.d["media_off"][g["slug"]] = str(e)[:200]
-                self.post(g, clean, att)
+                self.post(g, text_vk, att)
             except Exception as e:
                 log.error("ошибка публикации в %s: %s", g["vk"], e)
         if mid:
