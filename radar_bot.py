@@ -271,7 +271,7 @@ class Bot:
             if not matches_filter(full, g.get("filter")):
                 continue
             # пост без своего региона, но с чужой географией (Одесса, Киев, Германия…) в региональную группу не идёт
-            if not region_ok(full, g):
+            if not region_ok(full, g, kind):
                 log.info("пропуск: не про регион %s: %s", g["vk"], clean[:60].replace("\n", " "))
                 continue
             if kind == "quiet" and not self.quiet_allowed(g["slug"]):
