@@ -283,9 +283,9 @@ class Bot:
                 att = None
                 if ck and (g.get("cards") or {}).get(ck):
                     used = self.state.d["cards"].setdefault(g["slug"], {})
-                    if card_decision(used, ck, time.time(), self.rules):   # одна серия оповещений — одна карточка
+                    if card_decision(used, ck, time.time(), self.rules, full):   # одна серия оповещений — одна карточка
                         att = g["cards"][ck]
-                if not att and carry_source_photos(kind, self.rules):     # плашки «Опасность» из MAX не переносим
+                if not att and carry_source_photos(kind, self.rules, full):   # плашки оповещений из MAX не переносим, фото новостей — да
                     photos = self.media_attachments(g, atts)
                     if photos:
                         try:
