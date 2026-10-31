@@ -8,6 +8,9 @@ FIX-4  card_decision(): одна серия оповещений — одна к
 FIX-5  carry_source_photos(): картинки-плашки оповещений из MAX в ВК не переносятся.
 FIX-6  complete_alert(): «🔴Республика Татарстан» → дописываем «Опасность по БПЛА»; «✅ Регион» — это отбой.
 FIX-7  Памятки («🚨План действий при угрозе удара БПЛА», «что делать», «правила поведения») идут без карточки.
+FIX-8  «Опасность сохраняется / продолжается / ещё действует» — продолжение той же серии, без новой карточки.
+FIX-5b Фото из MAX: у чистого оповещения (это плашка канала) не переносим, у новостного поста (последствия, итоги,
+       длинный текст — то, на что карточка не положена) фото переносим.
 """
 import re
 
@@ -202,10 +205,16 @@ def card_kind(kind: str, text: str):
 # Стало: одна запись на группу — карточка, только если
 #   (а) вид оповещения сменился (опасность → отбой и т.п.) и с прошлой карточки прошло не меньше card_min_interval_minutes, или
 #   (б) с прошлой карточки прошло больше card_gap_minutes (новая серия).
-def card_decision(group_state: dict, ck, now: float, rules: dict) -> bool:
+# FIX-8: продолжение уже идущей тревоги — не новая серия
+CONTINUE = re.compile(r"(сохраня|продолжа|ещ[её] действ|по-прежнему|оста[её]тся в силе|не отменен|не отменён)", re.IGNORECASE)
+
+
+def card_decision(group_state: dict, ck, now: float, rules: dict, text: str = "") -> bool:
     if not ck:
         return False
     last, last_t = group_state.get("_last"), float(group_state.get("_t", float("-inf")))
+    if ck == last and CONTINUE.search(text or ""):
+        return False                     # «Опасность сохраняется» после «Опасность» — без новой карточки
     gap = float(rules.get("card_gap_minutes", 45)) * 60
     min_iv = float(rules.get("card_min_interval_minutes", 15)) * 60
     since = now - last_t
@@ -218,7 +227,9 @@ def card_decision(group_state: dict, ck, now: float, rules: dict) -> bool:
 
 # FIX-5: фото из поста MAX у оповещений (опасность / отбой / внимание) — это картинки-плашки самого канала
 # («ОПАСНОСТЬ ПО БПЛА»). Раньше, если нашу карточку не вешали, бот переносил их — визуально те же «карточки подряд».
-def carry_source_photos(kind: str, rules: dict) -> bool:
-    if kind in ("danger", "clear", "attention"):
-        return bool(rules.get("alert_source_photos", False))
-    return True
+def carry_source_photos(kind: str, rules: dict, text: str = "") -> bool:
+    if kind not in ("danger", "clear", "attention") or rules.get("alert_source_photos", False):
+        return True
+    # FIX-5b: чистое оповещение (на него положена наша карточка) — картинка в MAX это плашка, не переносим;
+    # новостной пост тревожного типа (последствия, итоги ночи, памятка, длинный текст) — фото настоящее, переносим.
+    return card_kind(kind, text) is None
