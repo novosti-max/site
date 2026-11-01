@@ -135,7 +135,16 @@ def status():
     when = time.strftime("%d.%m %H:%M", time.localtime(float(d.get("login_at", 0))))
     if d.get("error"):
         return False, f"вход {when} (VK id {d.get('user_id')}), {d['error']} — войдите ещё раз"
+    if not can_photos():
+        return False, (f"вход {when} (VK id {d.get('user_id')}), но VK выдал только доступы: {d.get('scope') or '—'} — "
+                       "без доступа к фото бот грузит фото по-старому (на стене их не видно)")
     return True, f"вход {when} (VK id {d.get('user_id')}), доступы: {d.get('scope') or '—'}; ключ продлевается сам"
+
+
+def can_photos() -> bool:
+    """Есть ли у входа доступ к фото и стене (VK ID может выдать только vkid.personal_info)."""
+    sc = set((load().get("scope") or "").replace(",", " ").split())
+    return {"photos", "wall"} <= sc
 
 
 def _api(method, tok, **p):
