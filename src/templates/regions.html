@@ -19,6 +19,12 @@
       <li><a class="region" href="/reklama/{{ r.slug }}/"><span class="region__name">{{ r.name }}</span><span class="region__meta">{{ r.count }} {{ plural(r.count, 'канал', 'канала', 'каналов') }}</span><span class="region__subs">{{ r.subs|short }}</span></a></li>
       {% endfor %}
     </ul>
+    {% if city_pages %}
+    <h2 class="h2 h2--sm">Отдельные города</h2>
+    <ul class="chips">
+      {% for s in city_pages %}<li><a href="/reklama/{{ s.slug }}/">{{ s.name }} <span>{{ s.subs|short }}</span></a></li>{% endfor %}
+    </ul>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

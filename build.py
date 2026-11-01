@@ -5,6 +5,8 @@
   data/channels.csv  — список каналов сети (тип, регион, название, подписчики, ссылки)
   data/stats.json    — свежие цифры из MaxFrame (пишет update.py), перекрывают CSV
   data/regions.json  — регион → страница города (slug, название, «в городе»)
+  data/cities.json   — страницы крупных вторых городов: родительский регион и каналы
+  data/seo/<slug>.json — тексты, вопросы-ответы и соседние регионы страницы
   data/site.json     — домен, контакт, цена пакета, коды Вебмастера/Метрики
 
 Результат: папка public/ — главная, страницы городов /reklama/<город>/, sitemap.xml, robots.txt.
@@ -45,6 +47,15 @@ def short(n):
 
 def ru_date(dt):
     return f"{dt.day} {MONTHS[dt.month - 1]} {dt.year}"
+
+
+def price_from(views7):
+    """1 000 ₽ за 1 000 просмотров: цена поста = средний охват, вниз до 100 ₽."""
+    return views7 // 100 * 100 if views7 and views7 >= 100 else None
+
+
+def rub(n):
+    return f"от {num(n)} ₽" if n else "по запросу"
 
 
 def plural(n, one, few, many):
@@ -94,6 +105,7 @@ def load():
                 "federal": bool(reg.get("federal")),
                 "subs": int(s.get("subs") or row["Подписчики"] or 0),
                 "views": s.get("views24"),
+                "price": price_from(s.get("views7")),
                 "max_url": row["Ссылка"].strip(),
                 "mf_url": mf,
                 "initials": initials(row["Канал"]),
@@ -104,10 +116,34 @@ def load():
     updated = stats.get("updated")
     updated_dt = datetime.datetime.fromisoformat(updated).astimezone(MSK) if updated else \
         datetime.datetime.fromtimestamp((DATA / "channels.csv").stat().st_mtime, MSK)
-    price = (stats.get("network") or {}).get("price")
-    if price:
-        site["package_price"] = price  # цена всей сетки — как опубликована в MaxFrame
+    # цена всей сети фиксированная: data/site.json, из MaxFrame не перекрывается
     return site, regions, channels, updated_dt
+
+
+def summarize(p):
+    p["subs"] = sum(c["subs"] for c in p["channels"])
+    vs = [c["views"] for c in p["channels"] if c["views"] is not None]
+    p["views"] = sum(vs) if vs else None
+    p["count"] = len(p["channels"])
+    p["has_city"] = any(c["type"] == "city" for c in p["channels"])
+    p["price"] = sum(c["price"] or 0 for c in p["channels"]) or None
+
+
+def load_seo(p):
+    """data/seo/<slug>.json: подставляет живые цифры в тексты и готовит разметку FAQPage."""
+    path = DATA / "seo" / f"{p['slug']}.json"
+    if not path.exists():
+        return None
+    seo = json.loads(path.read_text("utf-8"))
+    vals = {"count": p["count"], "subs": short(p["subs"]), "price": rub(p["price"])}
+    seo["blocks"] = [{"h": b["h"], "p": [t.format(**vals) for t in b["p"]]} for b in seo["blocks"]]
+    seo["faq"] = [{"q": f["q"].format(**vals), "a": f["a"].format(**vals)} for f in seo["faq"]]
+    seo["faq_ld"] = json.dumps({
+        "@context": "https://schema.org", "@type": "FAQPage",
+        "mainEntity": [{"@type": "Question", "name": f["q"],
+                        "acceptedAnswer": {"@type": "Answer", "text": f["a"]}} for f in seo["faq"]],
+    }, ensure_ascii=False).replace("<", "\\u003c")
+    return seo
 
 
 def build():
@@ -122,11 +158,25 @@ def build():
         })
         p["channels"].append(c)
     for p in pages.values():
-        p["subs"] = sum(c["subs"] for c in p["channels"])
-        vs = [c["views"] for c in p["channels"] if c["views"] is not None]
-        p["views"] = sum(vs) if vs else None
-        p["count"] = len(p["channels"])
-        p["has_city"] = any(c["type"] == "city" for c in p["channels"])
+        summarize(p)
+        p["subcities"] = []
+
+    # вторые города: те же каналы, что и в регионе, но своя страница /reklama/<город>/
+    city_pages = {}
+    for slug, sub in json.loads((DATA / "cities.json").read_text("utf-8")).items():
+        if slug.startswith("_"):
+            continue
+        if slug in pages:
+            raise SystemExit(f"Страница «{slug}» уже занята регионом")
+        p = {"slug": slug, "federal": False, "subcities": [], **sub,
+             "channels": [c for c in channels if c["id"] in sub["channels"]],
+             "parent": pages[sub["parent"]]}
+        if len(p["channels"]) != len(sub["channels"]):
+            raise SystemExit(f"В data/cities.json у «{slug}» есть каналы не из channels.csv")
+        summarize(p)
+        p["parent"]["subcities"].append(p)
+        city_pages[slug] = p
+
     region_pages = sorted((p for p in pages.values() if not p["federal"]), key=lambda p: p["name"])
     federal_page = pages.get("rossiya")
     top_regions = sorted(region_pages, key=lambda p: -p["subs"])[:9]
@@ -143,11 +193,12 @@ def build():
     }
 
     env = Environment(loader=FileSystemLoader(SRC / "templates"), autoescape=select_autoescape(["html"]))
-    env.filters.update(num=num, short=short)
+    env.filters.update(num=num, short=short, rub=rub)
     env.globals.update(plural=plural)
     ctx = dict(site=site, totals=totals, updated=updated, updated_human=ru_date(updated),
                updated_iso=updated.isoformat(), region_pages=region_pages, federal_page=federal_page,
-               top_regions=top_regions, year=updated.year, has_views=totals["views"] is not None)
+               top_regions=top_regions, year=updated.year, has_views=totals["views"] is not None,
+               city_pages=list(city_pages.values()))
 
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -173,13 +224,18 @@ def build():
 
     render("index.html", "index.html", channels=channels, path="/")
     render("regions.html", "reklama/index.html", path="/reklama/")
-    for p in pages.values():
-        others = [o for o in top_regions if o["slug"] != p["slug"]][:6]
-        render("region.html", f"reklama/{p['slug']}/index.html", page=p, others=others,
+    every = {**pages, **city_pages}
+    for p in every.values():
+        seo = load_seo(p)
+        if seo and seo.get("neighbors"):
+            others = [every[s] for s in seo["neighbors"]]  # опечатка в файле остановит сборку
+        else:
+            others = [o for o in top_regions if o["slug"] != p["slug"]][:6]
+        render("region.html", f"reklama/{p['slug']}/index.html", page=p, others=others, seo=seo,
                path=f"/reklama/{p['slug']}/")
     render("404.html", "404.html", path="/404")
 
-    urls = ["/", "/reklama/"] + [f"/reklama/{s}/" for s in sorted(pages)]
+    urls = ["/", "/reklama/"] + [f"/reklama/{s}/" for s in sorted(every)]
     lastmod = updated.date().isoformat()
     sitemap = ['<?xml version="1.0" encoding="UTF-8"?>',
                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -192,7 +248,7 @@ def build():
     (OUT / "robots.txt").write_text(
         f"User-agent: *\nAllow: /\n\nHost: {site['domain']}\nSitemap: {site['domain']}/sitemap.xml\n", "utf-8")
 
-    print(f"Готово: {totals['count']} каналов, {len(pages)} страниц регионов, "
+    print(f"Готово: {totals['count']} каналов, {len(pages)} страниц регионов, {len(city_pages)} страниц городов, "
           f"данные на {ru_date(updated)} → {OUT}")
 
 

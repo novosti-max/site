@@ -23,7 +23,12 @@ write_nginx() {
     root $DIR/public;
     index index.html;
     charset utf-8;
-    location / { try_files \$uri \$uri/ =404; }
+    location / {
+      try_files \$uri \$uri/ =404;
+      # без этого браузер показывает вчерашнюю главную из кэша, пока не обновят страницу
+      add_header Cache-Control \"no-cache\";
+      add_header X-Content-Type-Options nosniff;
+    }
     location /assets/ { expires 7d; add_header Cache-Control \"public\"; }
     location = /assets/catalog.json { expires 1h; }
     error_page 404 /404.html;

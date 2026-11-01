@@ -9,6 +9,7 @@
   </td>
   <td class="ch__num" data-label="Подписчики">{{ c.subs|num }}</td>
   {% if has_views %}<td class="ch__num ch__num--muted" data-label="Просмотры за 24 ч">{{ c.views|num }}</td>{% endif %}
+  <td class="ch__num ch__price" data-label="Цена поста">{{ c.price|rub }}</td>
   <td class="ch__act">
     <button class="add" type="button" data-add="{{ c.id }}" aria-pressed="false" aria-label="Добавить «{{ c.name }}» в подборку">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path class="add__plus" d="M10 4v12M4 10h12"/><path class="add__ok" d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>
@@ -25,6 +26,7 @@
       <th scope="col">Канал</th>
       <th scope="col" class="ch__num">Подписчики</th>
       {% if has_views %}<th scope="col" class="ch__num">Просмотры за 24 ч</th>{% endif %}
+      <th scope="col" class="ch__num">Цена поста</th>
       <th scope="col" class="ch__act"><span class="sr">Подборка</span></th>
     </tr>
   </thead>

@@ -3,7 +3,9 @@
 
 Берёт публичную страницу сети https://maxframe.ru/group-profile/132/ (вход не нужен),
 вытаскивает по каждому каналу: название, подписчиков, охват за 24 ч, аватарку;
-и по сети: цену размещения во всей сетке. Пишет data/stats.json и запускает build.py.
+и по сети: цену размещения во всей сетке. Со страницы каждого канала берёт средний
+охват поста за 7 дней (блок «Просмотры на пост»), из него build.py считает цены «от».
+Пишет data/stats.json и запускает build.py.
 
 Если страница не открылась или каналов распозналось подозрительно мало,
 старые цифры не трогаем — сайт продолжает показывать предыдущий день.
@@ -22,6 +24,7 @@ SITE = json.loads((DATA / "site.json").read_text("utf-8"))
 URL = SITE["maxframe_group"]
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36 novosti-max-site"
 MSK = datetime.timezone(datetime.timedelta(hours=3))
+PAUSE = 1.2  # пауза между страницами каналов: в robots.txt MaxFrame Crawl-delay 1
 
 
 def log(*a):
@@ -105,6 +108,28 @@ def parse(html):
     return channels, price
 
 
+def post_views_7d(html):
+    """Блок «Просмотры на пост» на странице канала: за день | за неделю | за месяц."""
+    m = re.search(r">\s*Просмотры на пост\s*</span>(.{0,1500}?)за месяц", html, re.S)
+    vals = re.findall(r"font-bold[^>]*>\s*([^<]*?)\s*</div>", m.group(1)) if m else []
+    return (to_int(vals[1]) or None) if len(vals) == 3 else None
+
+
+def fetch_post_views(known, old):
+    """Охват поста за 7 дней по каналам сети. Не открылось — оставляем вчерашнее значение."""
+    views7, failed = {}, []
+    for cid in known:
+        raw = get(f"https://maxframe.ru/channel-profile/{cid}/", tries=2)
+        v = post_views_7d(raw.decode("utf-8", "replace")) if raw else None
+        if v is None:
+            failed.append(cid)
+        views7[cid] = v if v is not None else old.get(cid, {}).get("views7")
+        time.sleep(PAUSE)
+    if failed:
+        log(f"нет охвата поста у {len(failed)} каналов из {len(known)}, оставлены прошлые значения:", ", ".join(failed))
+    return views7
+
+
 def main():
     raw = get(URL)
     if not raw:
@@ -134,12 +159,17 @@ def main():
                 if img and len(img) > 500:
                     (AVA / f"{cid}.jpg").write_bytes(img)
 
+    stats_path = DATA / "stats.json"
+    old = json.loads(stats_path.read_text("utf-8")).get("channels", {}) if stats_path.exists() else {}
+    views7 = fetch_post_views(known, old)
+
     stats = {
         "updated": datetime.datetime.now(MSK).replace(microsecond=0).isoformat(),
         "source": URL,
         "network": {"count": len(channels), "subs": sum(c["subs"] for c in channels.values()),
                     "views24": sum(c["views24"] or 0 for c in channels.values()), "price": price},
-        "channels": {k: {"name": v["name"], "subs": v["subs"], "views24": v["views24"]} for k, v in channels.items()},
+        "channels": {k: {"name": v["name"], "subs": v["subs"], "views24": v["views24"], "views7": views7.get(k)}
+                     for k, v in channels.items()},
         "new_in_maxframe": new,
         "missing_in_maxframe": gone,
     }

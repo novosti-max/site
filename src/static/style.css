@@ -317,3 +317,10 @@ img.ava{object-fit:cover;background:#e8ebf2}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+/* цены и SEO-тексты городских страниц */
+.ch__price{white-space:nowrap;font-weight:600}
+.seo{max-width:760px}
+.seo p{margin:0 0 14px;color:var(--ink-2)}
+.facts__price{grid-column:1/-1}
+.facts__price dd{white-space:nowrap}
