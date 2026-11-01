@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
                       region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only, headline,
-                      series_key, ALL_REGIONS)
+                      series_key, ALL_REGIONS, news_rubric, with_rubric)
 import vkid   # FIX-12: фото новостей — ключом админа (VK ID), иначе ВК не показывает их на стене
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -205,6 +205,21 @@ class Bot:
         self.state.d["quiet"][slug] = stamps + [now]
         return True
 
+    def rubric_blocked(self, slug):
+        """FIX-20: не больше rubric_per_day рубричных новостей в сутки на группу и ни одной, пока в регионе тревога
+        (последняя карточка — не отбой и оповещения были за последние rubric_alert_pause_min минут)."""
+        now = time.time()
+        used = self.state.d["cards"].get(slug, {})
+        last, seen = used.get("_last"), float(used.get("_seen", 0) or 0)
+        if last and not str(last).endswith("clear") and now - seen < float(self.rules.get("rubric_alert_pause_min", 90)) * 60:
+            return "идёт тревога"
+        stamps = [t for t in self.state.d.setdefault("rubric", {}).get(slug, []) if now - t < 86400]
+        if len(stamps) >= int(self.rules.get("rubric_per_day", 5)):
+            return "лимит за сутки"
+        if not self.dry:
+            self.state.d["rubric"][slug] = stamps + [now]
+        return None
+
     def remember_skip(self, source, text):
         """Последние 30 отсеянных постов целиком — чтобы видеть, что именно не прошло (страница настройки)."""
         sk = [x for x in self.state.d.setdefault("skipped", []) if x.get("text") != text]
@@ -318,15 +333,25 @@ class Bot:
             if not matches_filter(full, g.get("filter")):
                 continue
             # пост без своего региона, но с чужой географией (Одесса, Киев, Германия…) в региональную группу не идёт
+            rubric = None
             if not region_ok(clean, g, kind):   # FIX-17: без подписи канала («Рязань… - Подписаться»)
-                log.info("пропуск: не про регион %s: %s", g["vk"], clean[:60].replace("\n", " "))
-                continue
+                # FIX-20: зарубежье/политика/СВО — с рубрикой, без карточки, с лимитом и паузой на время тревоги
+                rubric = news_rubric(clean) if card_kind(kind, full) is None else None
+                if not rubric:
+                    log.info("пропуск: не про регион %s: %s", g["vk"], clean[:60].replace("\n", " "))
+                    continue
+                why = self.rubric_blocked(g["slug"])
+                if why:
+                    log.info("пропуск рубрики %s в %s (%s): %s", rubric, g["vk"], why, clean[:60].replace("\n", " "))
+                    continue
             if kind == "quiet" and not self.quiet_allowed(g["slug"]):
                 log.info("пропуск «тихо» для %s (лимит)", g["vk"])
                 continue
             try:
                 text_vk = complete_alert(kind, clean, full)   # «🔴Республика Татарстан» -> + «Опасность по БПЛА»
-                ck = card_kind(kind, full)
+                ck = None if rubric else card_kind(kind, full)
+                if rubric:
+                    text_vk = with_rubric(text_vk, rubric)
                 if not ck and kind != "quiet":   # FIX-16: у новости первая строка — заголовок (значок + пустая строка)
                     text_vk = headline(text_vk)
                 att = None
