@@ -2,7 +2,7 @@
   "domain": "http://novosti-max.com",
   "brand": "Новости в MAX",
   "network": "Рекламная сеть Никита + Илья",
-  "contact_url": "https://clck.ru/3SYhWp",
+  "contact_url": "https://max.ru/u/f9LHodD0cOITBKDBvxxzbW5tA5x9wt2vr7deI1gz8L9u78pSjrAWTZMkgmA",
   "maxframe_group": "https://maxframe.ru/group-profile/132/",
   "package_price": 450000,
   "yandex_verification": "",
@@ -11,8 +11,8 @@
   "contacts": {
     "name": "Контакт для связи",
     "role": "Размещение рекламы в сети",
-    "max": "https://clck.ru/3SYhWp",
-    "telegram": "@ManagerAMEDIA",
+    "max": "https://max.ru/u/f9LHodD0cOITBKDBvxxzbW5tA5x9wt2vr7deI1gz8L9u78pSjrAWTZMkgmA",
+    "telegram": "@musatovtg",
     "email": "managernovostimax@gmail.com"
   }
 }
