@@ -234,9 +234,10 @@ def build():
         render("region.html", f"reklama/{p['slug']}/index.html", page=p, others=others, seo=seo,
                path=f"/reklama/{p['slug']}/")
     render("privacy.html", "privacy/index.html", path="/privacy/")
+    render("cookies.html", "cookies/index.html", path="/cookies/")
     render("404.html", "404.html", path="/404")
 
-    urls = ["/", "/reklama/"] + [f"/reklama/{s}/" for s in sorted(every)] + ["/privacy/"]
+    urls = ["/", "/reklama/"] + [f"/reklama/{s}/" for s in sorted(every)] + ["/privacy/", "/cookies/"]
     lastmod = updated.date().isoformat()
     sitemap = ['<?xml version="1.0" encoding="UTF-8"?>',
                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']

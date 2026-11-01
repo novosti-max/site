@@ -334,3 +334,5 @@ img.ava{object-fit:cover;background:#e8ebf2}
 .doc p,.doc li{color:var(--ink-2)}
 .doc h2{margin-top:28px}
 @media (max-width:640px){.hero__h--doc{font-size:22px}}
+.cookie__btns{display:flex;gap:8px;flex:none}
+@media (max-width:640px){.cookie__btns .btn{flex:1}}

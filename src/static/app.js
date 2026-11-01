@@ -220,17 +220,28 @@
     .catch(() => {});
 })();
 
-// плашка про cookie: скрываем навсегда после «Хорошо»
+// плашка cookie: Метрика запускается только после «Принять»
 (() => {
   const box = document.querySelector("[data-cookie]");
   if (!box) return;
-  const KEY = "nm-cookie-ok";
-  let seen = false;
-  try { seen = localStorage.getItem(KEY) === "1"; } catch (e) {}
-  if (seen) return;
-  box.hidden = false;
-  box.querySelector("[data-cookie-ok]").addEventListener("click", () => {
+  const KEY = "nm-cookie-consent";
+  const read = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
+  const write = v => { try { localStorage.setItem(KEY, v); } catch (e) {} };
+  let started = false;
+  const start = () => { if (!started && window.nmMetrika) { started = true; window.nmMetrika(); } };
+  const choice = read();
+  if (choice === "1") start();
+  else if (choice === null) box.hidden = false;
+  box.addEventListener("click", e => {
+    const b = e.target.closest("[data-cookie-choice]");
+    if (!b) return;
+    const had = read() === "1";
+    write(b.dataset.cookieChoice);
     box.hidden = true;
-    try { localStorage.setItem(KEY, "1"); } catch (e) {}
+    if (b.dataset.cookieChoice === "1") start();
+    else if (had) location.reload();  // отозвали согласие: выгружаем запущенную Метрику
+  });
+  document.addEventListener("click", e => {
+    if (e.target.closest("[data-cookie-open]")) box.hidden = false;
   });
 })();
