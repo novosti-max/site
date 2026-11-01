@@ -23,6 +23,7 @@ LOG_FILE = os.path.join(os.path.dirname(STATE_FILE), "bot.log")
 MAX_API = "https://platform-api.max.ru"
 VK_API = "https://api.vk.ru/method/"
 VK_V = "5.199"
+CORPUS_KEEP = 1500   # журнал постов MAX для проверки новых правил (state-папка/corpus.jsonl)
 
 log = logging.getLogger("radar")
 
@@ -140,6 +141,7 @@ class Bot:
         self.state = State()
         self.apply_secrets(secrets)
         self.chat_to_source = {}   # chat_id -> нормализованная ссылка канала
+        self._out, self._ocr = [], {}   # журнал постов (corpus): что реально вышло и что показал OCR по этому посту MAX
 
     def apply_secrets(self, secrets):
         self.secrets = secrets
@@ -194,6 +196,7 @@ class Bot:
         kind_att = (" с карточкой" if attachment in (g.get("cards") or {}).values() else " с фото") if attachment else ""   # FIX-17
         log.info("опубликовано в %s (пост %s)%s: %s", g["vk"], res.get("post_id"), kind_att,
                  text.replace("\n", " / ")[:90])
+        self._out.append([g["slug"], res.get("post_id"), kind_att.strip(), text[:400]])
 
     def quiet_allowed(self, slug):
         now = time.time()
@@ -268,11 +271,58 @@ class Bot:
             except Exception as e:
                 log.warning("картинка MAX не прочитана: %s", e)
                 continue
+            self._ocr[u] = list(res) if res else None   # журнал постов: прогон новых правил не запускает OCR заново
             if res:
                 return res
         return None
 
     def handle(self, msg):
+        """Пост MAX -> группы ВК (_handle). Потом пост и результат дописываются в журнал постов — уже после публикации,
+        тревоги это не задерживает. Журнал нужен, чтобы новое правило проверять на настоящих постах (tools/replay.py)."""
+        self._out, self._ocr = [], {}
+        try:
+            return self._handle(msg)
+        finally:
+            self.record_corpus(msg)
+
+    def record_corpus(self, msg):
+        """Пост MAX наших каналов -> строка в corpus.jsonl (последние CORPUS_KEEP). Ключей и токенов там нет:
+        только текст поста публичного канала, вложения (ссылки на картинки, кнопки), что вышло во ВК и что показал OCR."""
+        try:
+            rec, body = msg.get("recipient", {}) or {}, msg.get("body", {}) or {}
+            src = self.chat_to_source.get(rec.get("chat_id"))
+            if rec.get("chat_type") != "channel" or not src or not any(norm_link(g["source"]) == src for g in self.groups):
+                return
+            atts = []
+            for a in body.get("attachments") or []:
+                t, pl = a.get("type"), a.get("payload") or {}
+                if t == "image":
+                    atts.append({"type": t, "payload": {"url": pl.get("url")}})
+                elif t == "inline_keyboard":
+                    atts.append({"type": t, "payload": {"buttons": [[{"type": b.get("type"), "url": b.get("url")}
+                                                                      for b in row] for row in (pl.get("buttons") or [])]}})
+                else:
+                    atts.append({"type": t})
+            link = msg.get("link") or {}
+            row = {"t": msg.get("timestamp"), "rt": round(time.time(), 1), "chat": rec.get("chat_id"), "src": src,
+                   "mid": body.get("mid"), "text": body.get("text") or "", "atts": atts,
+                   "link": {"type": link.get("type"), "text": ((link.get("message") or {}).get("text") or "")} if link else None,
+                   "ocr": self._ocr, "out": self._out, "dry": self.dry}
+            path = os.path.join(os.path.dirname(STATE_FILE), "corpus.jsonl")
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            self._corpus_n = getattr(self, "_corpus_n", CORPUS_KEEP) + 1
+            if self._corpus_n > CORPUS_KEEP // 5:   # раз в ~300 постов (и при старте) обрезаем до последних CORPUS_KEEP
+                self._corpus_n = 0
+                lines = open(path, encoding="utf-8").readlines()
+                if len(lines) > CORPUS_KEEP:
+                    tmp = path + ".tmp"
+                    open(tmp, "w", encoding="utf-8").writelines(lines[-CORPUS_KEEP:])
+                    os.replace(tmp, path)
+        except Exception as e:
+            log.warning("журнал постов: %s", e)
+
+    def _handle(self, msg):
         rec, body = msg.get("recipient", {}), msg.get("body", {}) or {}
         if rec.get("chat_type") != "channel":
             return
