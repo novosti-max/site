@@ -136,7 +136,7 @@ def load_seo(p):
     if not path.exists():
         return None
     seo = json.loads(path.read_text("utf-8"))
-    vals = {"count": p["count"], "subs": short(p["subs"]), "price": rub(p["price"])}
+    vals = {"count": p["count"], "subs": short(p["subs"])}
     seo["blocks"] = [{"h": b["h"], "p": [t.format(**vals) for t in b["p"]]} for b in seo["blocks"]]
     seo["faq"] = [{"q": f["q"].format(**vals), "a": f["a"].format(**vals)} for f in seo["faq"]]
     seo["faq_ld"] = json.dumps({

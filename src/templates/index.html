@@ -2,7 +2,7 @@
 {% from "_row.html" import table %}
 {% import "_contacts.html" as contacts with context %}
 {% block title %}Реклама в каналах MAX (Макс): купить рекламу по городам России — «Новости в MAX»{% endblock %}
-{% block description %}Купить рекламу в каналах Макс: каталог из {{ totals.count }} каналов MAX в {{ totals.regions }} регионах — радары, городские новости и федеральные медиа, {{ totals.subs|short }} подписок. Цены от 1 000 ₽ за 1 000 просмотров, вся сеть — {{ site.package_price|num }} ₽.{% endblock %}
+{% block description %}Купить рекламу в каналах Макс: каталог из {{ totals.count }} каналов MAX в {{ totals.regions }} регионах — радары, городские новости и федеральные медиа, {{ totals.subs|short }} подписок. {% if site.show_prices %}Цены от 1 000 ₽ за 1 000 просмотров, вся сеть — {{ site.package_price|num }} ₽.{% else %}Стоимость обсуждается индивидуально.{% endif %}{% endblock %}
 {% block head %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"{{ site.brand }}","url":"{{ site.domain }}/","description":"Рекламная сеть каналов в мессенджере MAX: радары, городские новости и федеральные медиа"}</script>
 {% endblock %}
@@ -14,7 +14,7 @@
       <p class="hero__lead">{{ totals.count }} {{ plural(totals.count, 'канал', 'канала', 'каналов') }} в {{ totals.regions }} регионах: радары, городские новости и федеральные медиа. Купить рекламу в каналах MAX (или, как чаще пишут, Макс) просто: выберите города, соберите подборку и отправьте заявку в пару кликов.</p>
       <div class="hero__cta">
         <a class="btn btn--blue btn--big" href="#catalog">Выбрать каналы</a>
-        <a class="btn btn--line btn--big" href="#package">Вся сеть за {{ site.package_price|num }} ₽</a>
+        <a class="btn btn--line btn--big" href="#package">{% if site.show_prices %}Вся сеть за {{ site.package_price|num }} ₽{% else %}Вся сеть{% endif %}</a>
       </div>
       {{ contacts.strip() }}
       <dl class="facts facts--big">
@@ -84,10 +84,10 @@
       <button class="linkbtn" type="button" data-add-shown>Добавить показанные в подборку</button>
     </div>
 
-    {{ table(channels, has_views, id="cat") }}
+    {{ table(channels, has_views, id="cat", show_price=site.show_prices) }}
     <button class="btn btn--line more" type="button" data-more hidden>Показать все {{ totals.count }} каналов</button>
     <p class="empty" data-empty hidden>По этому запросу каналов нет. Сбросьте фильтр или попробуйте другое название города.</p>
-    <p class="muted small note">Подписчики{% if has_views %} и просмотры за 24 часа{% endif %} взяты из статистики MaxFrame и не являются прогнозом охвата рекламного поста. Цены «от»: 1 000 ₽ за 1 000 просмотров, по среднему охвату поста канала за 7 дней. Точную стоимость подтверждаем по заявке: она зависит от формата и даты.</p>
+    <p class="muted small note">Подписчики{% if has_views %} и просмотры за 24 часа{% endif %} взяты из статистики MaxFrame и не являются прогнозом охвата рекламного поста. {% if site.show_prices %}Цены «от»: 1 000 ₽ за 1 000 просмотров, по среднему охвату поста канала за 7 дней. Точную стоимость подтверждаем по заявке: она зависит от формата и даты.{% else %}Стоимость обсуждается индивидуально: она зависит от каналов, формата и даты.{% endif %}</p>
   </div>
 </section>
 
@@ -103,8 +103,9 @@
       </ul>
     </div>
     <div class="pack__price">
-      <p class="pack__sum">{{ site.package_price|num }} ₽</p>
-      <p class="pack__sub">за пост во всей сети. Формат и дату согласуем перед размещением.</p>
+      {% if site.show_prices %}<p class="pack__sum">{{ site.package_price|num }} ₽</p>
+      <p class="pack__sub">за пост во всей сети. Формат и дату согласуем перед размещением.</p>{% else %}<p class="pack__sum pack__sum--talk">Индивидуально</p>
+      <p class="pack__sub">Условия обсуждаем лично. Формат и дату согласуем перед размещением.</p>{% endif %}
       <button class="btn btn--white btn--wide" type="button" data-add-all>Выбрать всю сеть</button>
     </div>
   </div>
@@ -123,7 +124,7 @@
 
     <h2 class="h2 h2--sm">Частые вопросы</h2>
     <div class="faq">
-      <details><summary>Сколько стоит реклама в каналах MAX?</summary><p>Цена «от» у каждого канала в каталоге: 1 000 ₽ за 1 000 просмотров рекламного поста, по среднему охвату поста за 7 дней. Точная стоимость зависит от формата и даты. Пост сразу во всей сети стоит {{ site.package_price|num }} ₽. Добавьте нужные каналы в подборку и отправьте заявку: ответим с точной стоимостью.</p></details>
+      <details><summary>Сколько стоит реклама в каналах MAX?</summary>{% if site.show_prices %}<p>Цена «от» у каждого канала в каталоге: 1 000 ₽ за 1 000 просмотров рекламного поста, по среднему охвату поста за 7 дней. Точная стоимость зависит от формата и даты. Пост сразу во всей сети стоит {{ site.package_price|num }} ₽. Добавьте нужные каналы в подборку и отправьте заявку: ответим с точной стоимостью.</p>{% else %}<p>Стоимость обсуждается индивидуально: она зависит от каналов, формата и даты. Добавьте нужные каналы в подборку и отправьте заявку, и мы предложим условия под вашу задачу.</p>{% endif %}</details>
       <details><summary>Как купить рекламу в Макс?</summary><p>Мессенджер MAX многие называют просто «Макс». Чтобы купить рекламу в его каналах, выберите в каталоге города и каналы, нажмите «Оформить заявку» и отправьте текст нам в MAX, Telegram или на почту. Мы подтвердим дату, формат и стоимость, опубликуем пост и пришлём отчёт.</p></details>
       <details><summary>Как считается суммарная аудитория?</summary><p>Мы складываем подписчиков выбранных каналов. Один человек может быть подписан на несколько каналов, поэтому сумма больше числа уникальных людей. С охватом и просмотрами так же.</p></details>
       <details><summary>Насколько свежие цифры?</summary><p>Сайт обновляет статистику из MaxFrame каждый день. Сейчас показаны данные на {{ updated_human }}.</p></details>

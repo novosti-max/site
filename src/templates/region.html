@@ -5,7 +5,7 @@
 {% set cities = page.channels|selectattr("type", "equalto", "city")|list %}
 {% set media = page.channels|selectattr("type", "equalto", "media")|list %}
 {% block title %}{% if page.federal %}Реклама в федеральных каналах MAX по всей России{% else %}Реклама в каналах MAX {{ page.prep }}: купить рекламу в Макс, цены{% endif %} — Новости в MAX{% endblock %}
-{% block description %}{% if page.federal %}Федеральные каналы MAX для рекламы по всей России: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}, {{ page.subs|short }} подписок.{% else %}Реклама в мессенджере MAX {{ page.prep }}: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}{% if radars %} — {{ 'радар' if radars|length == 1 else 'радары' }}{% endif %}{% if cities %}{% if radars %} и{% else %} —{% endif %} городские новости{% endif %}, {{ page.subs|short }} подписок.{% endif %}{% if page.price and not page.federal %} {{ 'Все каналы' if page.count > 1 else 'Пост' }} {{ page.price|rub }}{{ ' за пост' if page.count > 1 }}.{% endif %} Купить рекламу в каналах Макс: соберите подборку и отправьте заявку.{% endblock %}
+{% block description %}{% if page.federal %}Федеральные каналы MAX для рекламы по всей России: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}, {{ page.subs|short }} подписок.{% else %}Реклама в мессенджере MAX {{ page.prep }}: {{ page.count }} {{ plural(page.count, 'канал', 'канала', 'каналов') }}{% if radars %} — {{ 'радар' if radars|length == 1 else 'радары' }}{% endif %}{% if cities %}{% if radars %} и{% else %} —{% endif %} городские новости{% endif %}, {{ page.subs|short }} подписок.{% endif %}{% if site.show_prices and page.price and not page.federal %} {{ 'Все каналы' if page.count > 1 else 'Пост' }} {{ page.price|rub }}{{ ' за пост' if page.count > 1 }}.{% endif %} Купить рекламу в каналах Макс: соберите подборку и отправьте заявку.{% endblock %}
 {% block head %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Главная","item":"{{ site.domain }}/"},{"@type":"ListItem","position":2,"name":"Реклама по городам","item":"{{ site.domain }}/reklama/"},{% if page.parent %}{"@type":"ListItem","position":3,"name":"{{ page.parent.name }}","item":"{{ site.domain }}/reklama/{{ page.parent.slug }}/"},{"@type":"ListItem","position":4,"name":"{{ page.name }}","item":"{{ site.domain }}/reklama/{{ page.slug }}/"}{% else %}{"@type":"ListItem","position":3,"name":"{{ page.name }}","item":"{{ site.domain }}/reklama/{{ page.slug }}/"}{% endif %}]}</script>
 {% if seo %}<script type="application/ld+json">{{ seo.faq_ld|safe }}</script>{% endif %}
@@ -26,11 +26,11 @@
       <div><dt>Каналов</dt><dd>{{ page.count }}</dd></div>
       <div><dt>Подписок суммарно</dt><dd>{{ page.subs|short }}</dd></div>
       {% if page.views is not none %}<div><dt>Просмотров за 24 ч</dt><dd>{{ page.views|short }}</dd></div>{% endif %}
-      {% if page.price and not page.federal %}<div class="facts__price"><dt>{{ 'Все каналы' if page.count > 1 else 'Пост в канале' }}</dt><dd>{{ page.price|rub }}</dd></div>{% endif %}
+      {% if site.show_prices and page.price and not page.federal %}<div class="facts__price"><dt>{{ 'Все каналы' if page.count > 1 else 'Пост в канале' }}</dt><dd>{{ page.price|rub }}</dd></div>{% endif %}
     </dl>
     <div class="hero__cta">
       <button class="btn btn--blue btn--big" type="button" data-add-ids="{{ page.channels|map(attribute='id')|join(',') }}">Добавить {{ 'все каналы' if page.count > 1 else 'канал' }} в подборку</button>
-      <a class="btn btn--line btn--big" href="{{ site.contact_url }}" target="_blank" rel="noopener">Узнать цену в MAX</a>
+      <a class="btn btn--line btn--big" href="{{ site.contact_url }}" target="_blank" rel="noopener">{{ 'Узнать цену в MAX' if site.show_prices else 'Обсудить в MAX' }}</a>
     </div>
     {{ contacts.strip() }}
   </div>
@@ -39,8 +39,8 @@
 <section class="sec" id="catalog">
   <div class="wrap">
     <h2 class="h2">Каналы MAX {{ page.prep if not page.federal else 'по всей России' }}</h2>
-    {{ table(page.channels, page.views is not none, show_region=page.federal) }}
-    <p class="muted small note">Данные MaxFrame на {{ updated_human }}. Цены «от»: 1 000 ₽ за 1 000 просмотров, по среднему охвату поста канала за 7 дней. Точную стоимость подтверждаем по заявке: она зависит от формата и даты.</p>
+    {{ table(page.channels, page.views is not none, show_region=page.federal, show_price=site.show_prices) }}
+    <p class="muted small note">Данные MaxFrame на {{ updated_human }}. {% if site.show_prices %}Цены «от»: 1 000 ₽ за 1 000 просмотров, по среднему охвату поста канала за 7 дней. Точную стоимость подтверждаем по заявке: она зависит от формата и даты.{% else %}Стоимость обсуждается индивидуально: она зависит от каналов, формата и даты.{% endif %}</p>
 
     {% if page.subcities %}
     <h2 class="h2 h2--sm">Города региона</h2>

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Ежедневное обновление цифр из MaxFrame и пересборка сайта.
 
-Берёт публичную страницу сети https://maxframe.ru/group-profile/132/ (вход не нужен),
+Берёт публичные страницы сетей из maxframe_groups в data/site.json (вход не нужен),
 вытаскивает по каждому каналу: название, подписчиков, охват за 24 ч, аватарку;
 и по сети: цену размещения во всей сетке. Со страницы каждого канала берёт средний
 охват поста за 7 дней (блок «Просмотры на пост»), из него build.py считает цены «от».
@@ -22,6 +22,7 @@ DATA = ROOT / "data"
 AVA = DATA / "ava"
 SITE = json.loads((DATA / "site.json").read_text("utf-8"))
 URL = SITE["maxframe_group"]
+URLS = SITE["maxframe_groups"]
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36 novosti-max-site"
 MSK = datetime.timezone(datetime.timedelta(hours=3))
 PAUSE = 1.2  # пауза между страницами каналов: в robots.txt MaxFrame Crawl-delay 1
@@ -131,12 +132,15 @@ def fetch_post_views(known, old):
 
 
 def main():
-    raw = get(URL)
-    if not raw:
-        log("MaxFrame недоступен, оставляю вчерашние данные")
-        return 1
-    html = raw.decode("utf-8", "replace")
-    channels, price = parse(html)
+    channels, price = {}, None
+    for url in URLS:
+        raw = get(url)
+        if not raw:
+            log("MaxFrame недоступен, оставляю вчерашние данные")
+            return 1
+        found, group_price = parse(raw.decode("utf-8", "replace"))
+        channels.update(found)
+        price = price or group_price
 
     with open(DATA / "channels.csv", encoding="utf-8-sig") as f:
         known = {row["MaxFrame"].rstrip("/").split("/")[-1]: row["Канал"] for row in csv.DictReader(f, delimiter=";")}

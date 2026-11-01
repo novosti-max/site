@@ -10,8 +10,8 @@ if git fetch -q origin main && [ "$(git rev-parse HEAD)" != "$(git rev-parse ori
   python3 build.py >/dev/null && echo "$(date '+%F %T') подтянуты правки $(git rev-parse --short HEAD)"
 fi
 
-# в stats.json ещё нет охвата поста (первый запуск с ценами): не ждём 06:10
-grep -q '"views7"' data/stats.json 2>/dev/null || python3 update.py >> /var/log/novosti-max.log 2>&1
+# в stats.json ещё нет каналов второй сети: не ждём 06:10
+grep -q '74942789851170' data/stats.json 2>/dev/null || python3 update.py >> /var/log/novosti-max.log 2>&1
 
 bash /opt/novosti-max/deploy/https.sh
 

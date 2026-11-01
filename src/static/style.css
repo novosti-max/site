@@ -348,3 +348,4 @@ img.ava{object-fit:cover;background:#e8ebf2}
 .facts--big{grid-template-columns:repeat(2,auto);gap:12px 48px}
 .facts--big dd{font-size:42px;white-space:nowrap}
 @media (max-width:640px){.facts--big{gap:10px 20px}.facts--big dd{font-size:28px}}
+.pack__sum--talk{font-size:clamp(28px,5vw,40px)}
