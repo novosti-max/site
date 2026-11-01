@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import requests, yaml
 
+import vkid   # FIX-12: вход администратора через VK ID — для фото новостей во ВК
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
 # В репозитории лежит только хэш ключа страницы, сам ключ знает владелец.
@@ -153,6 +155,13 @@ def page(key, msg=""):
     out.append(f"<h2>3. Режим</h2><div class=card><label><input type=checkbox name=dry_run {'checked' if dry else ''}> "
                "Пробный режим — ничего не публиковать, только писать в журнал, что бот выложил бы</label></div>")
     out.append("<p><button>Сохранить и проверить</button></p></form>")
+    vok, vtext = vkid.status()
+    out.append("<h2>4. Фото новостей — вход администратора через VK ID</h2><div class=card>"
+               "<p class=small>Фото, загруженные ключом группы, ВК на стене не показывает. Поэтому фото новостей бот "
+               "загружает от имени администратора групп. Ключ входа хранится только на этом сервере и продлевается сам; "
+               "входить нужно аккаунтом, который админит все группы.</p>"
+               f"<p>{mark(vok)} {html.escape(vtext)}</p>"
+               f"<p><a href='/{key}/vkid'><button type=button class=sec>Войти через VK ID</button></a></p></div>")
     try:
         tail = open(LOG_FILE, encoding="utf-8").read().splitlines()[-40:]
     except Exception:
@@ -199,9 +208,18 @@ class H(BaseHTTPRequestHandler):
         return self.key_value
 
     def do_GET(self):
+        url = urllib.parse.urlparse(self.path)
+        if url.path.strip("/") == "vkid":   # возврат из VK ID (через страницу-переход на сайте), ключа страницы в адресе нет
+            ok, text, key = vkid.finish({k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()})
+            msg = ("VK ID: ✓ " if ok else "VK ID: ✗ ") + text
+            if key:
+                return self.send(303, "", headers={"Location": f"/{key}/?m=" + urllib.parse.quote(msg)})
+            return self.send(200 if ok else 400, msg, "text/plain; charset=utf-8")
         p = self.parts()
         if p is None:
             return self.send(404, "Not found", "text/plain")
+        if p == ["vkid"]:
+            return self.send(302, "", headers={"Location": vkid.start(self.key())})
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         self.send(200, page(self.key(), html.escape(q.get("m", [""])[0])))
 
