@@ -38,7 +38,7 @@
       </div>
       <ul class="ccard__list">
         {% if c.max %}<li><span>MAX</span><a href="{{ c.max }}" target="_blank" rel="noopener">Написать в MAX</a></li>{% endif %}
-        {% if c.telegram %}<li><span>Telegram</span><a href="{{ tg_url(c.telegram) }}" target="_blank" rel="noopener">{{ tg_label(c.telegram) }}</a></li>{% endif %}
+        {% if c.telegram %}<li><span>Telegram</span><a href="{{ tg_url(c.telegram) }}" target="_blank" rel="noopener">Написать в Telegram</a></li>{% endif %}
         {% if c.email %}<li><span>Почта</span><a href="mailto:{{ c.email }}">{{ c.email }}</a></li>{% endif %}
       </ul>
       {% if c.max %}<a class="btn btn--blue btn--wide" href="{{ c.max }}" target="_blank" rel="noopener">Обсудить размещение</a>{% endif %}
