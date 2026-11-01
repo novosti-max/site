@@ -219,3 +219,18 @@
     })
     .catch(() => {});
 })();
+
+// плашка про cookie: скрываем навсегда после «Хорошо»
+(() => {
+  const box = document.querySelector("[data-cookie]");
+  if (!box) return;
+  const KEY = "nm-cookie-ok";
+  let seen = false;
+  try { seen = localStorage.getItem(KEY) === "1"; } catch (e) {}
+  if (seen) return;
+  box.hidden = false;
+  box.querySelector("[data-cookie-ok]").addEventListener("click", () => {
+    box.hidden = true;
+    try { localStorage.setItem(KEY, "1"); } catch (e) {}
+  });
+})();

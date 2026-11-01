@@ -233,9 +233,10 @@ def build():
             others = [o for o in top_regions if o["slug"] != p["slug"]][:6]
         render("region.html", f"reklama/{p['slug']}/index.html", page=p, others=others, seo=seo,
                path=f"/reklama/{p['slug']}/")
+    render("privacy.html", "privacy/index.html", path="/privacy/")
     render("404.html", "404.html", path="/404")
 
-    urls = ["/", "/reklama/"] + [f"/reklama/{s}/" for s in sorted(every)]
+    urls = ["/", "/reklama/"] + [f"/reklama/{s}/" for s in sorted(every)] + ["/privacy/"]
     lastmod = updated.date().isoformat()
     sitemap = ['<?xml version="1.0" encoding="UTF-8"?>',
                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']

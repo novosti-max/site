@@ -57,6 +57,7 @@
       <div>
         <a class="logo logo--foot" href="/"><span>Новости <b>в MAX</b></span></a>
         <p class="foot__note">{{ site.network }}. {{ totals.count }} {{ plural(totals.count, 'канал', 'канала', 'каналов') }} в MAX: радары, городские новости и федеральные медиа.</p>
+        <p class="foot__note"><a href="/privacy/">Политика конфиденциальности</a></p>
         <p class="foot__note">Цифры обновляются каждый день по данным <a href="{{ site.maxframe_group }}" rel="nofollow noopener" target="_blank">MaxFrame</a>. Последнее обновление: {{ updated_human }}.</p>
         <ul class="foot__contacts">
           <li>{{ site.contacts.name }}: {{ site.contacts.role|lower }}</li>
@@ -78,6 +79,10 @@
 </footer>
 
 {% include "_pick.html" %}
+<div class="cookie" data-cookie hidden>
+  <p>Мы используем cookie и Яндекс Метрику, чтобы считать посещения сайта. Подробнее в <a href="/privacy/">политике конфиденциальности</a>.</p>
+  <button class="btn btn--blue" type="button" data-cookie-ok>Хорошо</button>
+</div>
 <script src="/assets/app.js?v={{ updated.strftime('%Y%m%d%H') }}" defer></script>
 {% if site.yandex_metrika %}
 <script>(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");ym({{ site.yandex_metrika }},"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true});</script>

@@ -324,3 +324,13 @@ img.ava{object-fit:cover;background:#e8ebf2}
 .seo p{margin:0 0 14px;color:var(--ink-2)}
 .facts__price{grid-column:1/-1}
 .facts__price dd{white-space:nowrap}
+
+/* плашка cookie и страница политики */
+.cookie{position:fixed;left:16px;right:16px;bottom:16px;z-index:60;max-width:640px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:var(--r);background:var(--card);border:1px solid var(--line);box-shadow:0 8px 28px rgba(0,0,0,.14)}
+.cookie[hidden]{display:none}
+.cookie p{margin:0;font-size:14px;color:var(--ink-2)}
+@media (max-width:640px){.cookie{flex-direction:column;align-items:stretch}}
+.doc{max-width:760px}
+.doc p,.doc li{color:var(--ink-2)}
+.doc h2{margin-top:28px}
+@media (max-width:640px){.hero__h--doc{font-size:22px}}
