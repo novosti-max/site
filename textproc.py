@@ -183,6 +183,8 @@ ALERT_LINE = {"danger": "Опасность по БПЛА", "clear": "Отбой
 def complete_alert(kind: str, clean: str, text: str) -> str:
     if kind not in ("danger", "clear", "attention"):
         return clean
+    if NEWS_REPORT.search(clean) or len(clean) > 200:   # новость о налёте — не дописываем (01.11 08:11 Кстово)
+        return clean
     words = re.sub(r"[^\w\s]", " ", clean)
     if (CLEAR.search(words) if kind == "clear" else (ALERT.search(words) or ATTENTION.search(words))):
         return clean
