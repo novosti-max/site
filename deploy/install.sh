@@ -8,6 +8,12 @@ export DEBIAN_FRONTEND=noninteractive
 if ! python3 -c "import requests, yaml, zoneinfo" 2>/dev/null; then
   apt-get update -q && apt-get install -yq python3 python3-requests python3-yaml tzdata
 fi
+# Чтение картинок-плашек MAX («ОТБОЙ», «ОПАСНОСТЬ ПО БПЛА»). Не обязательно: если не установится, бот работает как раньше.
+if ! command -v tesseract >/dev/null 2>&1 || ! tesseract --list-langs 2>/dev/null | grep -x rus >/dev/null || ! python3 -c "import PIL" 2>/dev/null; then
+  (apt-get update -q && apt-get install -yq tesseract-ocr tesseract-ocr-rus python3-pil) >/dev/null 2>&1 \
+    || echo "$(date '+%F %T') бот: tesseract не установился — картинки MAX читать не будет"
+fi
+if command -v tesseract >/dev/null 2>&1; then echo "$(date '+%F %T') бот: OCR есть, языки: $(tesseract --list-langs 2>/dev/null | tail -n +2 | tr '\n' ' ')"; fi
 
 id radarbot >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin -d /var/lib/radar-bot radarbot
 install -d -o radarbot -g radarbot -m 700 /etc/radar-bot /var/lib/radar-bot
