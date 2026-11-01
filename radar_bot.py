@@ -219,7 +219,7 @@ class Bot:
         urls = [((a.get("payload") or {}).get("url")) for a in atts if a.get("type") == "image"]
         urls = [u for u in urls if u][:4]
         out = []
-        utok = vkid.token() if g.get("gid") else None   # FIX-12: ключ админа из входа VK ID (если вход выполнен)
+        utok = vkid.token() if g.get("gid") and vkid.can_photos() else None   # FIX-12: ключ админа (если VK дал доступ к фото)
         for u in urls:
             try:
                 img = requests.get(u, timeout=30)
