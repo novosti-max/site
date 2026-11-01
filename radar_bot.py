@@ -12,7 +12,7 @@ import requests, yaml
 from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
-                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image)
+                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
@@ -281,7 +281,8 @@ class Bot:
         # видно не будет (01.11 Липецк №456 вышел пустым «Липецкая область»). FIX-10: читаем плашку сами (OCR),
         # дописываем текст оповещения и дальше пост идёт как обычное оповещение — с НАШЕЙ карточкой, без картинки MAX.
         # Не распознали — не публикуем, пишем в журнал.
-        if kind == "news" and len(clean) <= 60 and any(a.get("type") == "image" for a in atts):
+        # FIX-11: только у поста «одно название места» — короткая новость с фото («Последствия атаки в Кстово») идёт как новость.
+        if kind == "news" and is_place_only(clean) and any(a.get("type") == "image" for a in atts):
             rec_img = self.image_alert(atts)
             if not rec_img:
                 log.info("пропуск: смысл только в картинке MAX в %s: %s", source, clean[:60].replace("\n", " "))
