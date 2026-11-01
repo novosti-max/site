@@ -11,3 +11,13 @@
 #   card: clear                    # danger/clear/missile/missile_clear/mvsh/mvsh_clear/attention — поставить нашу карточку
 #                                  # (вместо прежних вложений); none — убрать вложения; не указан — вложения как были
 #   delete: true                   # удалить пост — ТОЛЬКО с согласия Никиты
+
+# 01.11 — удаление по согласию Никиты («где ждуны написано — да»)
+- id: 2026-11-01-lipetsk-458-zhduny
+  group: lipetsk
+  post: 458
+  delete: true
+- id: 2026-11-01-kazan-245-zhduny
+  group: kazan
+  post: 245
+  delete: true
