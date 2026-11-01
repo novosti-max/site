@@ -3,8 +3,10 @@
 Зачем: фото, загруженное ключом сообщества через сервер сообщений, на стене ВК не видно (01.11, Липецк №456).
 Видимое фото на стене загружается только ключом пользователя-админа: photos.getWallUploadServer -> photos.saveWallPhoto.
 
-Как входят: страница настройки -> «Войти через VK ID» -> VK ID (OAuth 2.1, PKCE) -> страница-переход
-https://novosti-max.com/.well-known/acme-challenge/vkid.html -> страница настройки /vkid (обмен кода на ключ).
+Как входят: страница настройки -> «Войти через VK ID» (новая вкладка) -> VK ID (OAuth 2.1, PKCE) -> пустая страница
+https://oauth.vk.com/blank.html?code=… -> её адрес вставляют в поле на странице настройки -> обмен кода на ключ.
+(Адрес с портом 8443 VK не принимает, а .html из папки rb-status.txt сайт не отдаёт — поэтому так.)
+Код из адреса одноразовый, живёт 10 минут и без code_verifier (он есть только в памяти страницы настройки) бесполезен.
 Ключи лежат только на сервере: /var/lib/radar-bot/vkid.json (права 600). На страницу, в журнал и в репозиторий не выводятся.
 Ключ доступа живёт ~1 час, бот сам продлевает его по refresh_token (тот действует 180 дней и обновляется при продлении).
 """
@@ -14,7 +16,7 @@ import requests
 
 APP_ID = int(os.environ.get("RADAR_VKID_APP", "54866180"))   # приложение VK ID «Радар постинг» (номер не секретный)
 ID_HOST = os.environ.get("RADAR_VKID_HOST", "https://id.vk.ru")
-REDIRECT = os.environ.get("RADAR_VKID_REDIRECT", "https://novosti-max.com/.well-known/acme-challenge/vkid.html")
+REDIRECT = os.environ.get("RADAR_VKID_REDIRECT", "https://oauth.vk.com/blank.html")
 SCOPE = "photos wall groups"
 VK_API = "https://api.vk.ru/method/"
 FILE = os.environ.get("RADAR_VKID", "/var/lib/radar-bot/vkid.json")
@@ -61,6 +63,14 @@ def _err(r) -> str:
     if not isinstance(r, dict):
         return "непонятный ответ"
     return str(r.get("error_description") or r.get("error") or "нет ключа в ответе")[:200]
+
+
+def parse_return(url: str) -> dict:
+    """Адрес пустой страницы после входа (code, state, device_id в ?… или #…) -> параметры."""
+    u = urllib.parse.urlparse((url or "").strip())
+    q = dict(urllib.parse.parse_qsl(u.query))
+    q.update(urllib.parse.parse_qsl(u.fragment))
+    return q
 
 
 def finish(params: dict):
