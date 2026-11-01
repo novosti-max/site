@@ -12,7 +12,7 @@ import requests, yaml
 from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
-                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only)
+                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only, headline)
 import vkid   # FIX-12: фото новостей — ключом админа (VK ID), иначе ВК не показывает их на стене
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -325,6 +325,8 @@ class Bot:
             try:
                 text_vk = complete_alert(kind, clean, full)   # «🔴Республика Татарстан» -> + «Опасность по БПЛА»
                 ck = card_kind(kind, full)
+                if not ck and kind != "quiet":   # FIX-16: у новости первая строка — заголовок (значок + пустая строка)
+                    text_vk = headline(text_vk)
                 att = None
                 if ck and (g.get("cards") or {}).get(ck):
                     used = self.state.d["cards"].setdefault(g["slug"], {})
