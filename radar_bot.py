@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
                       region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only)
+import vkid   # FIX-12: фото новостей — ключом админа (VK ID), иначе ВК не показывает их на стене
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
@@ -218,10 +219,17 @@ class Bot:
         urls = [((a.get("payload") or {}).get("url")) for a in atts if a.get("type") == "image"]
         urls = [u for u in urls if u][:4]
         out = []
+        utok = vkid.token() if g.get("gid") else None   # FIX-12: ключ админа из входа VK ID (если вход выполнен)
         for u in urls:
             try:
                 img = requests.get(u, timeout=30)
                 img.raise_for_status()
+                if utok:
+                    try:
+                        out.append(vkid.upload_wall_photo(utok, g["gid"], img.content))
+                        continue
+                    except Exception as e:
+                        log.warning("фото для %s через VK ID не загрузилось (%s) — пробую ключом группы", g["vk"], e)
                 out.append(vk_upload_photo(self.token(g), img.content))
             except Exception as e:
                 log.warning("фото для %s не загрузилось: %s", g["vk"], e)
