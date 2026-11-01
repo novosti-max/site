@@ -12,7 +12,7 @@ import requests, yaml
 from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
-                      region_ok, card_decision, carry_source_photos, complete_alert)
+                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
@@ -227,6 +227,26 @@ class Bot:
                 log.warning("фото для %s не загрузилось: %s", g["vk"], e)
         return out
 
+    def fetch_image(self, url):
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        return r.content
+
+    def image_alert(self, atts):
+        """FIX-10: первая (до 2) картинка поста MAX → (вид, строка, способ) или None."""
+        if not self.rules.get("read_alert_images", True):
+            return None
+        urls = [((a.get("payload") or {}).get("url")) for a in atts if a.get("type") == "image"]
+        for u in [u for u in urls if u][:2]:
+            try:
+                res = alert_from_image(self.fetch_image(u), self.rules.get("image_color_fallback", False))
+            except Exception as e:
+                log.warning("картинка MAX не прочитана: %s", e)
+                continue
+            if res:
+                return res
+        return None
+
     def handle(self, msg):
         rec, body = msg.get("recipient", {}), msg.get("body", {}) or {}
         if rec.get("chat_type") != "channel":
@@ -258,11 +278,21 @@ class Bot:
         if not clean:
             return
         # Пост, где весь смысл в картинке MAX («Липецкая область» + плашка «Отбой»): картинку во ВК ключом сообщества
-        # видно не будет (01.11 Липецк №456 вышел пустым «Липецкая область») — такой пост не публикуем, пишем в журнал.
+        # видно не будет (01.11 Липецк №456 вышел пустым «Липецкая область»). FIX-10: читаем плашку сами (OCR),
+        # дописываем текст оповещения и дальше пост идёт как обычное оповещение — с НАШЕЙ карточкой, без картинки MAX.
+        # Не распознали — не публикуем, пишем в журнал.
         if kind == "news" and len(clean) <= 60 and any(a.get("type") == "image" for a in atts):
-            log.info("пропуск: смысл только в картинке MAX в %s: %s", source, clean[:60].replace("\n", " "))
-            self.remember_skip(source, text)
-            return
+            rec_img = self.image_alert(atts)
+            if not rec_img:
+                log.info("пропуск: смысл только в картинке MAX в %s: %s", source, clean[:60].replace("\n", " "))
+                self.remember_skip(source, text)
+                return
+            ik, line, how = rec_img
+            log.info("картинка MAX распознана (%s) в %s: %s -> %s", how, source, clean[:60].replace("\n", " "), line)
+            text = f"{text.rstrip()}\n{line}"
+            kind = classify(text)
+            clean = clean_text(text)
+            atts = [a for a in atts if a.get("type") != "image"]   # плашку MAX не переносим, ставим свою карточку
         # Ответ на свой же пост («✅Отбой!» в ответ на «Ростовская область. Ракетная опасность!»):
         # в ВК цитаты не видно, поэтому дописываем, к чему относится пост.
         quoted = ""
