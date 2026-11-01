@@ -161,7 +161,12 @@ def page(key, msg=""):
                "загружает от имени администратора групп. Ключ входа хранится только на этом сервере и продлевается сам; "
                "входить нужно аккаунтом, который админит все группы.</p>"
                f"<p>{mark(vok)} {html.escape(vtext)}</p>"
-               f"<p><a href='/{key}/vkid'><button type=button class=sec>Войти через VK ID</button></a></p></div>")
+               f"<p>1) <a href='/{key}/vkid' target=_blank rel=noopener><button type=button class=sec>Войти через VK ID</button></a> "
+               "— откроется новая вкладка, войдите и нажмите «Разрешить».</p>"
+               "<p>2) Откроется пустая страница oauth.vk.com/blank.html. Скопируйте её адрес <b>целиком</b> и вставьте сюда "
+               "(ссылка одноразовая, действует 10 минут; в чат её не отправляйте):</p>"
+               f"<form method=post action='/{key}/vkid'><input type=password name=vkid_url autocomplete=off "
+               "placeholder='https://oauth.vk.com/blank.html?code=…'><p><button class=sec>Сохранить вход</button></p></form></div>")
     try:
         tail = open(LOG_FILE, encoding="utf-8").read().splitlines()[-40:]
     except Exception:
@@ -229,6 +234,10 @@ class H(BaseHTTPRequestHandler):
             return self.send(404, "Not found", "text/plain")
         n = int(self.headers.get("Content-Length", 0) or 0)
         form = {k: v[0] for k, v in urllib.parse.parse_qs(self.rfile.read(n).decode("utf-8")).items()}
+        if p == ["vkid"]:   # адрес пустой страницы после входа VK ID; остальные настройки не трогаем
+            ok, text, _ = vkid.finish(vkid.parse_return(form.get("vkid_url", "")))
+            msg = ("VK ID: ✓ " if ok else "VK ID: ✗ ") + text
+            return self.send(303, "", headers={"Location": f"/{self.key()}/?m=" + urllib.parse.quote(msg)})
         s = load()
         s.setdefault("vk", {})
         if form.get("max_token", "").strip():
