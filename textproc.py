@@ -12,6 +12,8 @@ FIX-3b Без своего региона не идут и федеральны�
 FIX-8  «Опасность сохраняется / продолжается / ещё действует» — продолжение той же серии, без новой карточки.
 FIX-5b Фото из MAX: у чистого оповещения (это плашка канала) не переносим, у новостного поста (последствия, итоги,
        длинный текст — то, на что карточка не положена) фото переносим.
+FIX-10 alert_from_image(): пост MAX «Липецкая область» + картинка-плашка «ОТБОЙ» — плашку читаем (OCR tesseract),
+       пишем текст сами («Отбой опасности по БПЛА»), дальше пост идёт как обычное оповещение с НАШЕЙ карточкой.
 """
 import re
 
@@ -57,7 +59,7 @@ ATTENTION = re.compile(r"(\bвнимание\b|возможн\w* (?:атак|у�
 CONFIRMED = re.compile(rf"({OPAS}ь (?:по )?(?:бпла|беспилот|мвш)|ракетная опасность|воздушн\w* тревог|работ\w* пво|сирен|взрыв)", re.IGNORECASE)
 # Чем угрожают: ракеты, маловысотные шары или беспилотники
 MISSILE = re.compile(r"ракетн", re.IGNORECASE)
-MVSH = re.compile(r"(\bмвш\b|маловысотн\w* шар|аэростат|\bшар(?:ы|ов|а)?\b)", re.IGNORECASE)
+MVSH = re.compile(r"(\bмвш\b|маловысотн\w* шар|аэростат|\bшар(?:ы|ов|а|ам|ами|ах)?\b)", re.IGNORECASE)
 
 # Пост по теме радара (без карточки): аэропорты, сбитые БПЛА, итоги ночи
 ON_TOPIC = re.compile(r"(бпла|беспилот|пво|аэропорт|ограничени|ракет|дрон|рэб|сбит|перехвач|уничтож)", re.IGNORECASE)
@@ -272,3 +274,110 @@ def carry_source_photos(kind: str, rules: dict, text: str = "") -> bool:
     # FIX-5b: чистое оповещение (на него положена наша карточка) — картинка в MAX это плашка, не переносим;
     # новостной пост тревожного типа (последствия, итоги ночи, памятка, длинный текст) — фото настоящее, переносим.
     return card_kind(kind, text) is None
+
+
+# FIX-10: распознавание картинки-плашки MAX («ОПАСНОСТЬ ПО БПЛА», «ОТБОЙ», «РАКЕТНАЯ ОПАСНОСТЬ», «ВНИМАНИЕ»).
+# Способ — OCR (tesseract, rus). Если tesseract на сервере нет, по цвету плашки — только при rules.image_color_fallback
+# (красный не отличает ракеты от БПЛА, поэтому по умолчанию выключено). Не уверены — None: пост пропускается, как раньше.
+IMAGE_LINE = {"danger": "Опасность по БПЛА", "clear": "Отбой опасности по БПЛА",
+              "missile": "Ракетная опасность", "missile_clear": "Отбой ракетной опасности",
+              "mvsh": "Опасность: маловысотные шары", "mvsh_clear": "Отбой опасности: маловысотные шары",
+              "attention": "Внимание! Возможна атака БПЛА"}
+
+
+def _ocr_variants(data: bytes):
+    """Картинка → набор PNG для OCR: увеличенная (мелкие плашки MAX ~200 px), ч/б по светлому тексту и по тёмному."""
+    try:
+        from PIL import Image, ImageOps
+        import io
+        im = Image.open(io.BytesIO(data)).convert("RGB")
+        if im.width < 900:
+            k = max(2, min(5, 900 // max(im.width, 1)))
+            im = im.resize((im.width * k, im.height * k), Image.LANCZOS)
+        g = im.convert("L")
+        out = []
+        for img in (g.point(lambda p: 255 if p > 170 else 0), g.point(lambda p: 255 if p > 110 else 0), g):
+            b = io.BytesIO()
+            img.save(b, "PNG")
+            out.append(b.getvalue())
+        return out
+    except Exception:
+        return [data]
+
+
+def ocr_text(data: bytes, timeout: int = 20) -> str:
+    import shutil, subprocess
+    if not shutil.which("tesseract"):
+        return None
+    words = []
+    for v in _ocr_variants(data):
+        try:
+            r = subprocess.run(["tesseract", "stdin", "stdout", "-l", "rus+eng", "--psm", "6"],
+                               input=v, capture_output=True, timeout=timeout)
+            words.append(r.stdout.decode("utf-8", "ignore"))
+        except Exception:
+            continue
+        if _ocr_kind(" ".join(words)):
+            break
+    return " ".join(words)
+
+
+def _ocr_kind(t: str):
+    t = re.sub(r"\s+", " ", (t or "").lower().replace("ё", "е"))
+    if not t.strip():
+        return None
+    if re.search(r"(тихо|штатн|стабильн|чистое небо)", t):
+        return None
+    clear = re.search(r"(отбо|отмен)", t)
+    missile = re.search(r"ракет", t)
+    mvsh = re.search(r"(мвш|шар|аэростат)", t)
+    if clear:
+        return "missile_clear" if missile else ("mvsh_clear" if mvsh else "clear")
+    if missile:
+        return "missile"
+    if mvsh and re.search(r"(опасн|угроз)", t):
+        return "mvsh"
+    if re.search(r"(вниман|возможн)", t) and not re.search(r"(?<![а-я])опасност", t):
+        return "attention"
+    if re.search(r"((?<![а-я])опасн|угроз|тревог|бпла)", t):
+        return "danger"
+    return None
+
+
+def _color_kind(data: bytes):
+    """Запасной способ без OCR: плашка — это крупная однотонная заливка. Красная → опасность, зелёная → отбой."""
+    try:
+        from PIL import Image
+        import io, colorsys
+        im = Image.open(io.BytesIO(data)).convert("RGB")
+        im.thumbnail((120, 120))
+        px = list(im.getdata())
+        red = green = 0
+        for r, g, b in px:
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if s < 0.45 or v < 0.35:
+                continue
+            if h < 0.03 or h > 0.95:
+                red += 1
+            elif 0.25 < h < 0.45:
+                green += 1
+        n = len(px) or 1
+        if red / n > 0.45 and green / n < 0.05:
+            return "danger"
+        if green / n > 0.45 and red / n < 0.05:
+            return "clear"
+    except Exception:
+        pass
+    return None
+
+
+def alert_from_image(data: bytes, color_fallback: bool = False):
+    """→ (вид, строка текста, способ) или None. Вид — ключ карточки: danger / clear / missile / … / attention."""
+    if not data:
+        return None
+    t = ocr_text(data)
+    if t is not None:
+        k = _ocr_kind(t)
+        return (k, IMAGE_LINE[k], "OCR") if k else None
+    k = _color_kind(data) if color_fallback else None
+    return (k, IMAGE_LINE[k], "цвет") if k else None
