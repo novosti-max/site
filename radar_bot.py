@@ -425,8 +425,72 @@ class Bot:
                 log.error("ошибка поста «перешлите» в %s: %s", g["vk"], e)
         self.state.save()
 
+    # FIX-14: исправление уже вышедших постов по списку fixes.yaml (его правят коммитом в ветку radar-bot).
+    # Каждая запись выполняется один раз (по id), итог — в журнал («исправление …»). Удаление — только с согласия Никиты.
+    def apply_fixes(self):
+        path = os.path.join(HERE, "fixes.yaml")
+        if not os.path.exists(path):
+            return
+        try:
+            items = yaml.safe_load(open(path, encoding="utf-8")) or []
+        except Exception as e:
+            log.error("исправления: fixes.yaml не читается: %s", e)
+            return
+        done = self.state.d.setdefault("fixes", {})
+        for f in items if isinstance(items, list) else []:
+            fid = str((f or {}).get("id") or "")
+            if not fid or fid in done:
+                continue
+            res = self.apply_fix(f)
+            log.info("исправление %s: %s", fid, res)
+            if not self.dry:
+                done[fid] = res[:200]
+        self.state.save()
+
+    def apply_fix(self, f):
+        g = next((x for x in self.groups if f.get("group") in (x["slug"], x["vk"])), None)
+        if not g or not f.get("post"):
+            return "ошибка: не найдена группа или не указан пост"
+        pid, owner = int(f["post"]), -int(g["gid"])
+        try:
+            if f.get("delete"):
+                if self.dry:
+                    return f"пробно: удалил бы пост {pid} в {g['vk']}"
+                vk_call("wall.delete", self.token(g), owner_id=owner, post_id=pid)
+                return f"удалён пост {pid} в {g['vk']}"
+            post = None
+            for off in (0, 100):
+                items = vk_call("wall.get", self.token(g), owner_id=owner, count=100, offset=off).get("items", [])
+                post = next((it for it in items if it.get("id") == pid), None)
+                if post or len(items) < 100:
+                    break
+            if not post:
+                return f"ошибка: пост {pid} не найден в последних 200 записях {g['vk']}"
+            text = f["text"].rstrip() if f.get("text") is not None else (post.get("text") or "")
+            card = f.get("card")
+            if card == "none":
+                att = ""
+            elif card:
+                att = (g.get("cards") or {}).get(card)
+                if not att:
+                    return f"ошибка: у {g['vk']} нет карточки «{card}»"
+            else:
+                att = ",".join(f"{a['type']}{a[a['type']]['owner_id']}_{a[a['type']]['id']}"
+                               + (f"_{a[a['type']]['access_key']}" if a[a['type']].get("access_key") else "")
+                               for a in post.get("attachments", []) if a.get("type") in ("photo", "video", "doc", "audio"))
+            if not text.strip() and not att:
+                return "ошибка: у поста не останется ни текста, ни вложений"
+            if self.dry:
+                return f"пробно: исправил бы пост {pid} в {g['vk']}"
+            vk_call("wall.edit", self.token(g), owner_id=owner, post_id=pid, message=text,
+                    **({"attachments": att} if att else {}))   # без attachments ВК убирает вложения
+            return f"исправлен пост {pid} в {g['vk']}" + (f" (карточка: {card})" if card else "")
+        except Exception as e:
+            return f"ошибка: {e}"[:200]
+
     def run(self):
         self.cleanup_once()
+        self.apply_fixes()   # FIX-14
         self.resolve_chats()
         log.info("старт: %d групп, %d каналов видно%s", len(self.groups), len(self.chat_to_source), " (ПРОБНЫЙ РЕЖИМ)" if self.dry else "")
         secrets_mtime = os.path.getmtime(SECRETS_FILE) if os.path.exists(SECRETS_FILE) else 0
