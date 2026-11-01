@@ -12,7 +12,8 @@ import requests, yaml
 from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
-                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only, headline)
+                      region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only, headline,
+                      series_key, ALL_REGIONS)
 import vkid   # FIX-12: фото новостей — ключом админа (VK ID), иначе ВК не показывает их на стене
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -190,7 +191,8 @@ class Bot:
         if attachment:
             params["attachments"] = attachment
         res = vk_call("wall.post", self.token(g), **params)
-        log.info("опубликовано в %s (пост %s)%s: %s", g["vk"], res.get("post_id"), " с карточкой" if attachment else "",
+        kind_att = (" с карточкой" if attachment in (g.get("cards") or {}).values() else " с фото") if attachment else ""   # FIX-17
+        log.info("опубликовано в %s (пост %s)%s: %s", g["vk"], res.get("post_id"), kind_att,
                  text.replace("\n", " / ")[:90])
 
     def quiet_allowed(self, slug):
@@ -316,7 +318,7 @@ class Bot:
             if not matches_filter(full, g.get("filter")):
                 continue
             # пост без своего региона, но с чужой географией (Одесса, Киев, Германия…) в региональную группу не идёт
-            if not region_ok(full, g, kind):
+            if not region_ok(clean, g, kind):   # FIX-17: без подписи канала («Рязань… - Подписаться»)
                 log.info("пропуск: не про регион %s: %s", g["vk"], clean[:60].replace("\n", " "))
                 continue
             if kind == "quiet" and not self.quiet_allowed(g["slug"]):
@@ -329,7 +331,10 @@ class Bot:
                     text_vk = headline(text_vk)
                 att = None
                 if ck and (g.get("cards") or {}).get(ck):
-                    used = self.state.d["cards"].setdefault(g["slug"], {})
+                    skey = g["slug"]
+                    if g["slug"] in ALL_REGIONS and series_key(clean):   # FIX-17: в «России» серия у каждого региона своя
+                        skey = f'{g["slug"]}:{series_key(clean)}'
+                    used = self.state.d["cards"].setdefault(skey, {})
                     if card_decision(used, ck, time.time(), self.rules, full):   # одна серия оповещений — одна карточка
                         att = g["cards"][ck]
                 if not att and carry_source_photos(kind, self.rules, full):   # плашки оповещений из MAX не переносим, фото новостей — да
