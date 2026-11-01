@@ -245,3 +245,18 @@
     if (e.target.closest("[data-cookie-open]")) box.hidden = false;
   });
 })();
+
+// цифры на главной: плавный счёт, итоговый текст уже в HTML
+(() => {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll("[data-count]").forEach(el => {
+    const end = +el.dataset.count, text = el.textContent, start = performance.now(), MS = 1200;
+    const tick = now => {
+      const k = Math.min((now - start) / MS, 1);
+      if (k === 1) { el.textContent = text; return; }
+      el.textContent = Math.round(end * (1 - Math.pow(1 - k, 3))).toLocaleString("ru-RU");
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+})();
