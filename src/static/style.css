@@ -344,8 +344,7 @@ img.ava{object-fit:cover;background:#e8ebf2}
 .cookie__btns{display:flex;gap:8px;flex:none}
 @media (max-width:640px){.cookie__btns .btn{flex:1}}
 
-/* две крупные цифры на главной и блок «Почему мы» */
+/* две крупные цифры на главной */
 .facts--big{grid-template-columns:repeat(2,auto);gap:12px 48px}
 .facts--big dd{font-size:42px;white-space:nowrap}
 @media (max-width:640px){.facts--big{gap:10px 20px}.facts--big dd{font-size:28px}}
-.steps--plain li::before{display:none}
