@@ -58,4 +58,8 @@ else
   rm -f "$NEW"
 fi
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw allow 8443/tcp >/dev/null; fi
+# Вход VK ID: VK не принимает адрес возврата с портом 8443, поэтому возврат идёт на страницу-переход на сайте
+# (та же папка, что и rb-status.txt), а она передаёт ответ на страницу настройки :8443/vkid.
+ACME=/var/www/acme/.well-known/acme-challenge
+if [ -d "$ACME" ]; then install -m 644 "$DIR/deploy/vkid.html" "$ACME/vkid.html" || echo "$(date '+%F %T') бот: не удалось положить vkid.html"; fi
 echo "$(date '+%F %T') бот: установлен/обновлён $(git -C "$DIR" rev-parse --short HEAD)"
