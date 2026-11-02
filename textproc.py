@@ -178,6 +178,19 @@ FOREIGN = re.compile(r"(украин|киев|одесс|харьков|запо
 POLITICS = re.compile(r"(\bмид\b|перемири|прекращени\w* огня|переговор|санкци|песков|захаров|госдум|правительств|путин|"
                       r"ушаков|кремл|президент)", re.IGNORECASE)
 RF_STRIKES = re.compile(r"(\bвс рф\b|вооруж\w* сил\w* (?:российск|рф)|нанесени\w* удар|удар\w* возмезди)", re.IGNORECASE)
+# FIX-24 (02.11): «уничтожены 212 украинских беспилотников» — налёт на Россию, а не зарубежье (уходило с «🌍 МИР»)
+UA_DRONES = re.compile(r"украинск\w*\s+(?:\w+\s+){0,2}(?:беспилот|бпла|дрон|ракет|бэк|катер)\w*", re.IGNORECASE)
+# FIX-24: «СВО» — только когда речь про Украину/фронт («США… ядерный удар по Ирану» уходило с «⚔️ СВО»)
+UA = re.compile(r"(украин|\bвсу\b|киев|одесс|харьков|запорож|херсон|днепр|николаев|львов|полтав|кременчуг|винниц|"
+                r"чернигов|сумск|\bсумы\b|борисп|зеленск|алешк|донбас|донецк|луганск|\bднр\b|\bлнр\b|фронт|\bсво\b)",
+                re.IGNORECASE)
+
+
+def _foreign(text: str):
+    """FOREIGN без «украинских беспилотников/ракет»: сбитые над Россией украинские БПЛА — новость о налёте."""
+    return FOREIGN.search(UA_DRONES.sub(" ", text or ""))
+
+
 RU_ATTACK = re.compile(r"(бпла|беспилот|дрон|\bатак|ракет|\bпво\b|нпз|нефтеза|сбит|сбили|перехвач|уничтож|теракт|диверси)",
                        re.IGNORECASE)
 
@@ -202,7 +215,7 @@ def region_ok(text: str, g, kind: str = None) -> bool:
         # не делает её новостью радара: политика/зарубежье проходят, только если речь о налёте/БПЛА
         t0 = text or ""
         h0 = _head(t0)   # FIX-21: решает заголовок, а не упоминание Украины где-то в тексте
-        if FOREIGN.search(h0) or POLITICS.search(h0) or RF_STRIKES.search(h0):
+        if _foreign(h0) or POLITICS.search(h0) or RF_STRIKES.search(h0):
             return bool(RU_ATTACK.search(t0))
         return True
     # в боевом config post_news: true, поэтому политика (kind=news) проверяется так же строго
@@ -211,7 +224,7 @@ def region_ok(text: str, g, kind: str = None) -> bool:
     # («атака БПЛА на НПЗ в Кстово», «за ночь сбито 235 БПЛА над областями»). Но не зарубежье/Украина, не политика,
     # не удары ВС РФ и не чужие оповещения (у них карточка и они про другой регион).
     h = _head(t)     # FIX-21: «Подросток готовил теракт в Царицыно» с «украинскими кураторами» в тексте — не «МИР»
-    if FOREIGN.search(h) or POLITICS.search(h) or RF_STRIKES.search(h):
+    if _foreign(h) or POLITICS.search(h) or RF_STRIKES.search(h):
         return False
     if not (GEO.search(t) or NEWSY.search(t)):
         return True                                   # приветствие, благодарность ПВО, «тихо» — без географии
@@ -374,11 +387,11 @@ def news_rubric(text: str):
     """Рубрика новости, которая не про свой регион: svo / politics / world или None (тогда в группу не идёт).
     FIX-21: по заголовку — упоминание Украины в середине российской новости не делает её «МИРОМ»."""
     t = _head(text)
-    if RF_STRIKES.search(t) or ((FOREIGN.search(t) or POLITICS.search(t)) and SVO.search(t)):
+    if RF_STRIKES.search(t) or (SVO.search(t) and UA.search(UA_DRONES.sub(" ", t))):   # FIX-24
         return "svo"
     if POLITICS.search(t):
         return "politics"
-    if FOREIGN.search(t):
+    if _foreign(t):
         return "world"
     return None
 
