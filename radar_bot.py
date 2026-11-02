@@ -404,7 +404,9 @@ class Bot:
             try:
                 text_vk = complete_alert(kind, clean, full)   # «🔴Республика Татарстан» -> + «Опасность по БПЛА»
                 ck = None if rubric else card_kind(kind, full)
-                if rubric:
+                if rubric and self.rules.get("rubric_labels", False):
+                    # FIX-26 (02.11, Никита): метки «🌍 МИР | », «⚔️ СВО | », «🏛 ПОЛИТИКА | » не ставим.
+                    # Лимит в сутки и пауза во время тревоги для таких новостей остаются. Вернуть метки — rules.rubric_labels: true
                     text_vk = with_rubric(text_vk, rubric)
                 if not ck and kind != "quiet":   # FIX-16: у новости первая строка — заголовок (значок + пустая строка)
                     text_vk = headline(text_vk)
