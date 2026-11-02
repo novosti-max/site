@@ -240,6 +240,10 @@ class Bot:
         urls = [u for u in urls if u][:4]
         out = []
         utok = vkid.token() if g.get("gid") and vkid.can_photos() else None   # FIX-12: ключ админа (если VK дал доступ к фото)
+        if not utok and not self.rules.get("group_photos", False):
+            # FIX-25 (02.11): фото, загруженное ключом группы, ВК на стене не показывает (Самара №492 и др. — «с фото»,
+            # а фото не видно). Пока VK ID не даст доступ к фото, новости идут текстом и без лишних секунд на загрузку.
+            return []
         for u in urls:
             try:
                 img = requests.get(u, timeout=30)
