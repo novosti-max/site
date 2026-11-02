@@ -24,6 +24,8 @@ MAX_API = "https://platform-api.max.ru"
 VK_API = "https://api.vk.ru/method/"
 VK_V = "5.199"
 CORPUS_KEEP = 1500   # журнал постов MAX для проверки новых правил (state-папка/corpus.jsonl)
+MAX_STALL = 20 * 60   # FIX-28: столько секунд MAX не присылает ни одного события — переподключаемся (как при перезапуске)
+MAX_BEAT = 30 * 60    # FIX-28: раз в 30 мин пишем в журнал, сколько событий пришло из MAX
 
 log = logging.getLogger("radar")
 
@@ -582,12 +584,21 @@ class Bot:
         self.resolve_chats()
         log.info("старт: %d групп, %d каналов видно%s", len(self.groups), len(self.chat_to_source), " (ПРОБНЫЙ РЕЖИМ)" if self.dry else "")
         secrets_mtime = os.path.getmtime(SECRETS_FILE) if os.path.exists(SECRETS_FILE) else 0
+        # FIX-28 (02.11): дважды за день (11:57–13:29 и после 18:30) бот работал, но из MAX не приходило ни одного
+        # события, пока его не перезапустили. Теперь: тишина MAX_STALL — новое соединение с тем же marker (то же, что
+        # делает перезапуск, посты не теряются), и раз в MAX_BEAT строка «приём MAX: N событий» — видно, жив ли приём.
+        self._last_event = self._beat = time.time()
+        self._events = 0
         while True:
             if os.path.exists(SECRETS_FILE) and os.path.getmtime(SECRETS_FILE) != secrets_mtime:
                 log.info("ключи изменены на странице настройки — перезапускаюсь")
                 sys.exit(0)            # systemd сразу запустит заново уже с новыми ключами
             try:
+                self.watch_max()
                 r = self.max.updates(self.state.d["marker"])
+                if r.get("updates"):
+                    self._last_event = time.time()
+                    self._events += len(r["updates"])
                 for u in r.get("updates", []):
                     if u.get("update_type") == "message_created":
                         self.handle(u.get("message") or {})
@@ -604,6 +615,22 @@ class Bot:
             except Exception as e:
                 log.exception("ошибка: %s", e)
                 time.sleep(5)
+
+
+    def watch_max(self):
+        """FIX-28: журнал приёма и переподключение к MAX, если события долго не приходят."""
+        now = time.time()
+        if now - self._beat >= MAX_BEAT:
+            log.info("приём MAX: %d событий за %d мин", self._events, round((now - self._beat) / 60))
+            self._beat, self._events = now, 0
+        if now - self._last_event >= MAX_STALL:
+            log.warning("приём MAX: %d мин нет событий — переподключаюсь", round((now - self._last_event) / 60))
+            try:
+                self.max.s.close()
+            except Exception:
+                pass
+            self.max = MAX(self.secrets.get("max_token", ""))
+            self._last_event = now
 
 
 def wait_for_secrets():
