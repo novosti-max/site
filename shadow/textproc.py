@@ -305,7 +305,9 @@ def card_decision(group_state: dict, ck, now: float, rules: dict, text: str = ""
     new_series = (now - seen) >= reset
     group_state["_seen"] = now
     if CONTINUE.search(text or "") and not new_series:
-        ok = False
+        # FIX-23: «…сохраняется» серию не меняет. 02.11 Воронеж: «✅Отмена непосредственной опасности… Режим опасности
+        # сохраняется» ставил серии вид «отбой», и настоящий «Отбой опасности по БПЛА» в 05:59 вышел без зелёной карточки.
+        return False
     else:
         ok = new_series or ck != last
     group_state["_last"] = ck
