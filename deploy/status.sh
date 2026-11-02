@@ -14,7 +14,7 @@ LOG=/var/lib/radar-bot/bot.log
     tail -n +"${SINCE:-1}" "$LOG" > /tmp/rb-since.log
     echo "с запуска $(head -c 14 /tmp/rb-since.log): опубликовано $(grep -c ' опубликовано в ' /tmp/rb-since.log)," \
          "пропусков $(grep -c ' пропуск' /tmp/rb-since.log), ошибок $(grep -c -E ' ошибка|Traceback|упал' /tmp/rb-since.log)," \
-         "предупреждений $(grep -c -E 'не загрузилось|не прочитана|не прошёл|журнал постов:' /tmp/rb-since.log);" \
+         "предупреждений $(grep -c -E 'не загрузилось|не прочитана|не прошёл|журнал постов:|переподключаюсь' /tmp/rb-since.log);" \
          "в журнале постов: $(wc -l < /var/lib/radar-bot/corpus.jsonl 2>/dev/null || echo 0)"
     rm -f /tmp/rb-since.log
   fi
