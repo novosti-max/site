@@ -417,16 +417,17 @@ class Bot:
                 if ck and (g.get("cards") or {}).get(ck):
                     skeys = [g["slug"]]
                     if g["slug"] in ALL_REGIONS and series_keys(clean):   # FIX-17: в «России» серия у каждого региона своя
-                        # FIX-30: пост на несколько регионов меняет серию каждого из них (отбой «Краснодар / Ростов»)
                         skeys = [f'{g["slug"]}:{k}' for k in series_keys(clean)]
                     now = time.time()
-                    give = False
-                    for skey in skeys:   # без досрочного выхода: состояние обновляется у всех регионов
-                        used = self.state.d["cards"].setdefault(skey, {})
-                        if card_decision(used, ck, now, self.rules, full):   # одна серия оповещений — одна карточка
-                            give = True
-                    if give:
+                    used = self.state.d["cards"].setdefault(skeys[0], {})
+                    if card_decision(used, ck, now, self.rules, full):   # одна серия оповещений — одна карточка
                         att = g["cards"][ck]
+                    if ck.endswith("clear"):
+                        # FIX-30: отбой на несколько регионов закрывает серию и у остальных регионов списка
+                        # («✅Краснодарский край / Ростовская область / Отбой» — потом Ростов №10522 без карточки).
+                        # Карточку решает первый регион, как раньше.
+                        for skey in skeys[1:]:
+                            card_decision(self.state.d["cards"].setdefault(skey, {}), ck, now, self.rules, full)
                 if not att and carry_source_photos(kind, self.rules, full):   # плашки оповещений из MAX не переносим, фото новостей — да
                     photos = self.media_attachments(g, atts)
                     if photos:
