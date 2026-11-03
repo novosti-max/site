@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DANGLING_SIGN,
                       region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only, headline,
-                      series_key, ALL_REGIONS, news_rubric, with_rubric)
+                      series_key, series_keys, ALL_REGIONS, news_rubric, with_rubric)
 import vkid   # FIX-12: фото новостей — ключом админа (VK ID), иначе ВК не показывает их на стене
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -415,12 +415,19 @@ class Bot:
                     text_vk = headline(text_vk)
                 att = None
                 if ck and (g.get("cards") or {}).get(ck):
-                    skey = g["slug"]
-                    if g["slug"] in ALL_REGIONS and series_key(clean):   # FIX-17: в «России» серия у каждого региона своя
-                        skey = f'{g["slug"]}:{series_key(clean)}'
-                    used = self.state.d["cards"].setdefault(skey, {})
-                    if card_decision(used, ck, time.time(), self.rules, full):   # одна серия оповещений — одна карточка
+                    skeys = [g["slug"]]
+                    if g["slug"] in ALL_REGIONS and series_keys(clean):   # FIX-17: в «России» серия у каждого региона своя
+                        skeys = [f'{g["slug"]}:{k}' for k in series_keys(clean)]
+                    now = time.time()
+                    used = self.state.d["cards"].setdefault(skeys[0], {})
+                    if card_decision(used, ck, now, self.rules, full):   # одна серия оповещений — одна карточка
                         att = g["cards"][ck]
+                    if ck.endswith("clear"):
+                        # FIX-30: отбой на несколько регионов закрывает серию и у остальных регионов списка
+                        # («✅Краснодарский край / Ростовская область / Отбой» — потом Ростов №10522 без карточки).
+                        # Карточку решает первый регион, как раньше.
+                        for skey in skeys[1:]:
+                            card_decision(self.state.d["cards"].setdefault(skey, {}), ck, now, self.rules, full)
                 if not att and carry_source_photos(kind, self.rules, full):   # плашки оповещений из MAX не переносим, фото новостей — да
                     photos = self.media_attachments(g, atts)
                     if photos:

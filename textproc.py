@@ -381,6 +381,17 @@ def series_key(text: str):
     return (m.group(1) or m.group(2)).lower()[:6]
 
 
+def series_keys(text: str) -> list:
+    """FIX-30 (03.11): все регионы оповещения по порядку. «✅Краснодарский край / Ростовская область / Отбой» закрывал
+    серию только Краснодара — следующая «Ростовская область / Авиационная опасность» (Россия №10522) шла без карточки."""
+    out = []
+    for m in _REGION_RE.finditer((text or "").replace("ё", "е")):
+        k = (m.group(1) or m.group(2)).lower()[:6]
+        if k not in out:
+            out.append(k)
+    return out
+
+
 # FIX-20: рубрики для «чужих» новостей в региональных группах
 SVO = re.compile(r"(\bвсу\b|\bвс рф\b|вооруж\w* сил|удар|обстрел|фронт|\bсво\b|наступлени|освобожд\w* (?:сел|пос|город))",
                  re.IGNORECASE)
