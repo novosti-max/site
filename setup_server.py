@@ -123,7 +123,8 @@ def mark(ok):
 
 def page(key, msg=""):
     c, s = cfg(), load()
-    groups = [g for g in c["groups"] if g.get("enabled")]
+    # выключенные группы с gid тоже показываем: ключ можно ввести заранее, бот в них не постит, пока enabled: false
+    groups = [g for g in c["groups"] if g.get("enabled") or g.get("gid")]
     mok, mtext, links = check_max(s.get("max_token", ""))
     out = [f"<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
            f"<title>Настройка бота Радар</title><style>{CSS}</style></head><body><main>",
@@ -145,7 +146,8 @@ def page(key, msg=""):
     for g in groups:
         ok, text = check_vk(g, vkkeys.get(g["slug"]))
         seen = norm(g["source"]) in links
-        out.append(f"<div class=card><div class=row><label>{html.escape(g['city'])} — vk.com/{g['vk']}</label>"
+        out.append(f"<div class=card><div class=row><label>{html.escape(g['city'])} — vk.com/{g['vk']}"
+                   f"{'' if g.get('enabled') else ' <span class=small>(бот пока не постит — только ключ)</span>'}</label>"
                    f"<a href='https://vk.com/club{g['gid']}?act=tokens' target=_blank rel=noopener>создать ключ ↗</a></div>"
                    f"<input type=password name='vk_{g['slug']}' autocomplete=off placeholder='{'задан' if vkkeys.get(g['slug']) else 'вставьте ключ группы'}'>"
                    f"<p class=small>{mark(ok)} ВК: {html.escape(text)} &nbsp; {mark(seen if mok else None)} "
