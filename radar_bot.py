@@ -297,7 +297,8 @@ class Bot:
         try:
             rec, body = msg.get("recipient", {}) or {}, msg.get("body", {}) or {}
             src = self.chat_to_source.get(rec.get("chat_id"))
-            if rec.get("chat_type") != "channel" or not src or not any(norm_link(g["source"]) == src for g in self.groups):
+            # 03.11: пишем и посты источников выключенных групп — чтобы до включения посмотреть в shadow, что пойдёт в группу
+            if rec.get("chat_type") != "channel" or not src or not any(norm_link(g["source"]) == src for g in self.cfg["groups"]):
                 return
             atts = []
             for a in body.get("attachments") or []:
