@@ -7,7 +7,7 @@
 Пробный режим:     python3 radar_bot.py --dry-run      (ничего не публикует, только пишет в лог)
 Список каналов:    python3 radar_bot.py --list-chats   (какие каналы видит MAX-бот)
 """
-import argparse, datetime as dt, json, logging, logging.handlers, os, sys, time
+import argparse, datetime as dt, hashlib, json, logging, logging.handlers, os, sys, time
 import requests, yaml
 from zoneinfo import ZoneInfo
 
@@ -62,6 +62,7 @@ class State:
         self.d.setdefault("promo", {})      # slug -> "2026-10-29"
         self.d.setdefault("cards", {})      # slug -> {вид карточки: время} — чтобы не вешать картинку на каждый пост серии
         self.d.setdefault("chats", {})      # chat_id (строкой) -> ссылка канала; узнаём из событий MAX
+        self.d.setdefault("recent", {})     # slug -> [[хэш текста, время]] — FIX-39, повтор новости в группу
 
     def save(self):
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
@@ -209,6 +210,26 @@ class Bot:
             return False
         self.state.d["quiet"][slug] = stamps + [now]
         return True
+
+    @staticmethod
+    def _text_key(text):
+        return hashlib.sha1(" ".join(text.split()).lower().encode("utf-8")).hexdigest()[:16]
+
+    def is_repeat(self, slug, text):
+        """FIX-39 (04.11): канал MAX Казани выложил «Европе грозит раскол…» дважды (с картинкой и без) — в ВК вышло
+        два одинаковых поста (Татарстан №283/№284). Новость с тем же текстом в ту же группу за rules.repeat_minutes
+        (30) минут второй раз не публикуем. Только новости без карточки: оповещения (опасность → отбой → снова
+        опасность с тем же текстом) не трогаем."""
+        win = float(self.rules.get("repeat_minutes", 30)) * 60
+        now = time.time()
+        rec = [r for r in self.state.d["recent"].get(slug, []) if now - r[1] < win]
+        self.state.d["recent"][slug] = rec
+        return any(r[0] == self._text_key(text) for r in rec)
+
+    def remember_text(self, slug, text):
+        rec = self.state.d["recent"].setdefault(slug, [])
+        rec.append([self._text_key(text), time.time()])
+        del rec[:-50]
 
     def rubric_blocked(self, slug):
         """FIX-20: не больше rubric_per_day рубричных новостей в сутки на группу и ни одной, пока в регионе тревога
@@ -419,6 +440,12 @@ class Bot:
                     text_vk = with_rubric(text_vk, rubric)
                 if not ck and kind != "quiet":   # FIX-16: у новости первая строка — заголовок (значок + пустая строка)
                     text_vk = headline(text_vk)
+                # короткие сообщения («Рязань / Сбитие БПЛА») повторяются как отдельные события — их не режем
+                news_like = (card_kind(kind, full) is None and kind in ("news", "topic")
+                             and len(clean) >= int(self.rules.get("repeat_min_chars", 150)))
+                if news_like and self.is_repeat(g["slug"], text_vk):   # FIX-39: тот же текст в группу второй раз
+                    log.info("пропуск: повтор новости в %s: %s", g["vk"], clean[:60].replace("\n", " "))
+                    continue
                 att = None
                 # FIX-37 (04.11, Никита): в «России» и мониторинг.рф карточки только на ракетную опасность и её отбой
                 # (`card_kinds` в config). Россия №10604: «Тюменская область / Опасность… / Татарстан / Отбой» вышла с
@@ -445,11 +472,15 @@ class Bot:
                     if photos:
                         try:
                             self.post(g, text_vk, ",".join(photos))
+                            if news_like:
+                                self.remember_text(g["slug"], text_vk)
                             continue
                         except Exception as e:
                             log.warning("пост с фото в %s не прошёл (%s) — фото для этой группы отключаю, публикую текстом", g["vk"], e)
                             self.state.d["media_off"][g["slug"]] = str(e)[:200]
                 self.post(g, text_vk, att)
+                if news_like:
+                    self.remember_text(g["slug"], text_vk)
             except Exception as e:
                 log.error("ошибка публикации в %s: %s", g["vk"], e)
         if mid:
