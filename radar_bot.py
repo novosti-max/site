@@ -422,7 +422,8 @@ class Bot:
                 att = None
                 if ck and (g.get("cards") or {}).get(ck):
                     skeys = [g["slug"]]
-                    if g["slug"] in ALL_REGIONS and series_keys(clean):   # FIX-17: в «России» серия у каждого региона своя
+                    # FIX-34 (04.11): группа на несколько областей (Приграничье: Белгород, Курск, Брянск) — серия у каждой своя
+                    if (g["slug"] in ALL_REGIONS or g.get("series_by_region")) and series_keys(clean):   # FIX-17: в «России» серия у каждого региона своя
                         skeys = [f'{g["slug"]}:{k}' for k in series_keys(clean)]
                     now = time.time()
                     used = self.state.d["cards"].setdefault(skeys[0], {})
