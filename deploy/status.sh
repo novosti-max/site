@@ -20,6 +20,28 @@ LOG=/var/lib/radar-bot/bot.log
   fi
   echo ---
   tail -n 60 "$LOG" 2>/dev/null
+  echo --- posts
+  # 04.11: последние посты каждого канала MAX из журнала постов (текст, вложения, куда вышло) — видно, что пришло из MAX,
+  # даже если бот пост пропустил молча. Ключей тут нет: только текст публичных каналов.
+  python3 - /var/lib/radar-bot/corpus.jsonl <<'PY' 2>/dev/null
+import json, sys, time
+rows = []
+for line in open(sys.argv[1], encoding="utf-8").readlines()[-600:]:
+    try:
+        rows.append(json.loads(line))
+    except Exception:
+        pass
+last = {}
+for r in rows:
+    last.setdefault(r.get("src"), []).append(r)
+for src in sorted(last, key=str):
+    for r in last[src][-3:]:
+        t = time.strftime("%d.%m %H:%M", time.localtime((r.get("t") or 0) / 1000 or r.get("rt") or 0))
+        atts = ",".join(a.get("type", "?") for a in r.get("atts") or [])
+        out = ",".join(f"{o[0]}{'+' + o[2] if o[2] else ''}" for o in r.get("out") or []) or "-"
+        text = (r.get("text") or "").replace("\n", " / ")[:90]
+        print(f"{t} {src} [{atts}] -> {out}: {text}")
+PY
   echo --- journal
   journalctl -u radar-bot -n 25 --no-pager -o cat 2>/dev/null | grep -v -i token
   echo --- install
