@@ -440,7 +440,9 @@ class Bot:
                     text_vk = with_rubric(text_vk, rubric)
                 if not ck and kind != "quiet":   # FIX-16: у новости первая строка — заголовок (значок + пустая строка)
                     text_vk = headline(text_vk)
-                news_like = card_kind(kind, full) is None and kind in ("news", "topic")
+                # короткие сообщения («Рязань / Сбитие БПЛА») повторяются как отдельные события — их не режем
+                news_like = (card_kind(kind, full) is None and kind in ("news", "topic")
+                             and len(clean) >= int(self.rules.get("repeat_min_chars", 150)))
                 if news_like and self.is_repeat(g["slug"], text_vk):   # FIX-39: тот же текст в группу второй раз
                     log.info("пропуск: повтор новости в %s: %s", g["vk"], clean[:60].replace("\n", " "))
                     continue
