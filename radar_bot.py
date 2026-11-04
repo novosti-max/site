@@ -420,7 +420,12 @@ class Bot:
                 if not ck and kind != "quiet":   # FIX-16: у новости первая строка — заголовок (значок + пустая строка)
                     text_vk = headline(text_vk)
                 att = None
-                if ck and (g.get("cards") or {}).get(ck):
+                # FIX-37 (04.11, Никита): в «России» и мониторинг.рф карточки только на ракетную опасность и её отбой
+                # (`card_kinds` в config). Россия №10604: «Тюменская область / Опасность… / Татарстан / Отбой» вышла с
+                # зелёной карточкой «ОТБОЙ». Остальные оповещения там идут текстом, без карточки и без плашки MAX.
+                if ck and g.get("card_kinds") is not None and ck not in g["card_kinds"]:
+                    pass
+                elif ck and (g.get("cards") or {}).get(ck):
                     skeys = [g["slug"]]
                     # FIX-34 (04.11): группа на несколько областей (Приграничье: Белгород, Курск, Брянск) — серия у каждой своя
                     if (g["slug"] in ALL_REGIONS or g.get("series_by_region")) and series_keys(clean):   # FIX-17: в «России» серия у каждого региона своя
