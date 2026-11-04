@@ -376,12 +376,6 @@ class Bot:
             kind = classify(text)
             clean = clean_text(text)
             atts = [a for a in atts if a.get("type") != "image"]   # плашку MAX не переносим, ставим свою карточку
-        # FIX-33 (04.11): «одно название места» без картинки-плашки (нет вложения image, только видео / ничего) —
-        # в ВК выходил пустой пост (Волгоград №492 «Волгоградская область»). Не публикуем, пишем в журнал.
-        if kind == "news" and is_place_only(clean) and (msg.get("link") or {}).get("type") != "reply":
-            log.info("пропуск: только название места в %s: %s", source, clean[:60].replace("\n", " "))
-            self.remember_skip(source, text)
-            return
         # Ответ на свой же пост («✅Отбой!» в ответ на «Ростовская область. Ракетная опасность!»):
         # в ВК цитаты не видно, поэтому дописываем, к чему относится пост.
         quoted = ""
@@ -391,6 +385,12 @@ class Bot:
             if qt:
                 quoted = ", ".join(l.strip().rstrip(",") for l in qt.splitlines() if l.strip())
                 clean = f"{clean}\n\n— {quoted}"
+        # FIX-33 (04.11): «одно название места» без картинки-плашки и без текста цитаты (нет вложения image, ответ на
+        # пост без текста) — в ВК выходил пустой пост (Волгоград №492 «Волгоградская область»). Не публикуем, пишем в журнал.
+        if kind == "news" and is_place_only(clean):
+            log.info("пропуск: только название места в %s: %s", source, clean[:60].replace("\n", " "))
+            self.remember_skip(source, text)
+            return
         full = text + ("\n" + quoted if quoted else "")
         for g in targets:
             if not matches_filter(full, g.get("filter")):
