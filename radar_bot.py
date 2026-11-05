@@ -235,10 +235,15 @@ class Bot:
         """FIX-20: не больше rubric_per_day рубричных новостей в сутки на группу и ни одной, пока в регионе тревога
         (последняя карточка — не отбой и оповещения были за последние rubric_alert_pause_min минут)."""
         now = time.time()
-        used = self.state.d["cards"].get(slug, {})
-        last, seen = used.get("_last"), float(used.get("_seen", 0) or 0)
-        if last and not str(last).endswith("clear") and now - seen < float(self.rules.get("rubric_alert_pause_min", 90)) * 60:
-            return "идёт тревога"
+        pause = float(self.rules.get("rubric_alert_pause_min", 90)) * 60
+        # FIX-43 (05.11): у группы с серией по областям (Приграничье, series_by_region) серии лежат в «<slug>:<область>».
+        # Раньше смотрели только «<slug>» — Приграничье №5164 (Киев) вышло во время тревоги в Курской области.
+        for key, used in self.state.d["cards"].items():
+            if key != slug and not key.startswith(slug + ":"):
+                continue
+            last, seen = used.get("_last"), float(used.get("_seen", 0) or 0)
+            if last and not str(last).endswith("clear") and now - seen < pause:
+                return "идёт тревога"
         stamps = [t for t in self.state.d.setdefault("rubric", {}).get(slug, []) if now - t < 86400]
         if len(stamps) >= int(self.rules.get("rubric_per_day", 5)):
             return "лимит за сутки"
