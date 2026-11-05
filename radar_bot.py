@@ -385,7 +385,11 @@ class Bot:
         # дописываем текст оповещения и дальше пост идёт как обычное оповещение — с НАШЕЙ карточкой, без картинки MAX.
         # Не распознали — не публикуем, пишем в журнал.
         # FIX-11: только у поста «одно название места» — короткая новость с фото («Последствия атаки в Кстово») идёт как новость.
-        if kind == "news" and is_place_only(clean) and any(a.get("type") == "image" for a in atts):
+        # FIX-41 (05.11): «БПЛА» в подписи канала («Волгоград 34| Радар БПЛА - Подписаться») давало classify() «topic», и
+        # проверки FIX-10/FIX-33 не срабатывали — Волгоград №509 вышел пустым «Волгоградская область». Смотрим и «topic»,
+        # если без подписи (clean) пост — «news».
+        place_only = (kind == "news" or (kind == "topic" and classify(clean) == "news")) and is_place_only(clean)
+        if place_only and any(a.get("type") == "image" for a in atts):
             rec_img = self.image_alert(atts)
             if not rec_img:
                 log.info("пропуск: смысл только в картинке MAX в %s: %s", source, clean[:60].replace("\n", " "))
@@ -408,7 +412,7 @@ class Bot:
                 clean = f"{clean}\n\n— {quoted}"
         # FIX-33 (04.11): «одно название места» без картинки-плашки и без текста цитаты (нет вложения image, ответ на
         # пост без текста) — в ВК выходил пустой пост (Волгоград №492 «Волгоградская область»). Не публикуем, пишем в журнал.
-        if kind == "news" and is_place_only(clean):
+        if (kind == "news" or (kind == "topic" and classify(clean) == "news")) and is_place_only(clean):   # FIX-41
             log.info("пропуск: только название места в %s: %s", source, clean[:60].replace("\n", " "))
             self.remember_skip(source, text)
             return
