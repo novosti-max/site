@@ -468,8 +468,25 @@ class Bot:
                         skeys = [f'{g["slug"]}:{k}' for k in series_keys(clean)]
                     now = time.time()
                     used = self.state.d["cards"].setdefault(skeys[0], {})
-                    if card_decision(used, ck, now, self.rules, full):   # одна серия оповещений — одна карточка
+                    # только «Россия» и мониторинг.рф: в Приграничье (series_by_region) отбой бывает по району без области
+                    multi = g["slug"] in ALL_REGIONS
+                    open_keys = []
+                    if multi and ck.endswith("clear") and not series_keys(clean):
+                        # FIX-45 (07.11): отбой без названия региона («✅Отбой ракетной опасности по ранее объявленным!»,
+                        # Россия №10778) в группе с сериями по регионам закрывает открытые серии всех регионов группы
+                        # (ракетный отбой — ракетные серии, отбой БПЛА — серии опасности/внимания) и получает зелёную
+                        # карточку, если такие серии были. Раньше он шёл только в общую серию группы: без карточки, а
+                        # серии Москвы, Липецка… оставались открытыми — следующая ракетная тревога вышла бы без карточки.
+                        reset = float(self.rules.get("series_reset_hours", 6)) * 3600
+                        opens = {"missile_clear": ("missile",), "mvsh_clear": ("mvsh",)}.get(ck, ("danger", "attention"))
+                        for k, st in self.state.d["cards"].items():
+                            if (k.startswith(g["slug"] + ":") and st.get("_last") in opens
+                                    and now - float(st.get("_seen", float("-inf"))) < reset):
+                                open_keys.append(k)
+                    if card_decision(used, ck, now, self.rules, full) or open_keys:   # одна серия оповещений — одна карточка
                         att = g["cards"][ck]
+                    for k in open_keys:
+                        card_decision(self.state.d["cards"][k], ck, now, self.rules, full)
                     if ck.endswith("clear"):
                         # FIX-30: отбой на несколько регионов закрывает серию и у остальных регионов списка
                         # («✅Краснодарский край / Ростовская область / Отбой» — потом Ростов №10522 без карточки).
