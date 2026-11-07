@@ -325,6 +325,8 @@ NEWS_REPORT = re.compile(r"(\bвсу\b|по словам|по данным|це�
 
 # FIX-7: памятки и инструкции — не оповещение, карточка «Опасность» на них не нужна
 AIRPORT = re.compile(r"аэропорт|аэродром|аэровокзал", re.IGNORECASE)   # FIX-35
+# FIX-48 (07.11): «Приморско-Ахтарск аэродром / ракетная опасность» (Краснодар №791) — тревога, FIX-35 её не глушит
+AIRPORT_ALERT = re.compile(r"(?<!без)опасност|тревог", re.IGNORECASE)
 MEMO = re.compile(r"(план действий|памятк|что делать|как действовать|правила поведени|рекомендаци\w* (?:при|для)|алгоритм действий)", re.IGNORECASE)
 
 
@@ -347,7 +349,7 @@ def card_kind(kind: str, text: str):
     # FIX-35 (04.11): пост об аэропорте («✅ Аэропорт НИЖНИЙ НОВГОРОД… СНЯТЫ ограничения на прием и выпуск») — новость,
     # не отбой. Нижний №287 вышел с зелёной карточкой «ОТБОЙ», и настоящий отбой №289 посчитался повтором — без карточки.
     first = next((l for l in body.splitlines() if l.strip()), "")
-    if AIRPORT.search(first):
+    if AIRPORT.search(first) and not AIRPORT_ALERT.search(body):
         return None
     if AFTERMATH.search(body) or (len(body) > 450 and not DANGER_MARK.search(text or "")) or not (ALERT.search(body) or DANGER_MARK.search(text or "") or CLEAR_MARK.search(text or "") or CHECK_MARK.search(text or "")):
         return None
