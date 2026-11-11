@@ -73,6 +73,7 @@ class State:
 
 # ---------------------------------------------------------------- ВКонтакте (ключи сообществ)
 def vk_call(method, token, **params):
+    last = ""
     for attempt in range(4):
         params.update(access_token=token, v=VK_V)
         r = requests.post(VK_API + method, data=params, timeout=30).json()
@@ -80,10 +81,13 @@ def vk_call(method, token, **params):
             return r["response"]
         code = r["error"].get("error_code")
         if code in (6, 9, 10):                  # слишком часто / временная ошибка
+            last = f"{r['error'].get('error_msg')} ({code})"
             time.sleep(1 + attempt)
             continue
         raise RuntimeError(f"VK {method}: {r['error'].get('error_msg')} ({code})")
-    raise RuntimeError(f"VK {method}: не получилось после повторов")
+    # 11.11: 11 таких ошибок 06:05–06:54 в 6 группах, а причину по журналу не понять — пишем последний ответ ВК
+    # (6 — слишком часто, 9 — flood control, 10 — внутренняя ошибка ВК)
+    raise RuntimeError(f"VK {method}: не получилось после повторов, последний ответ: {last}")
 
 
 def vk_upload_photo(token, image_bytes):
