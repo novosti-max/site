@@ -24,6 +24,15 @@ install -m 644 "$DIR/deploy/radar-bot.service" "$DIR/deploy/radar-setup.service"
 systemctl daemon-reload
 systemctl enable -q radar-bot radar-setup
 systemctl restart radar-bot radar-setup
+# 11.11: статус и проверка постов — своим таймером, раз в минуту, даже если автообновление зависло.
+# Ошибка здесь бота не останавливает.
+git -C "$DIR" config http.lowSpeedLimit 1000 || true   # оборванная загрузка из GitHub не висит часами
+git -C "$DIR" config http.lowSpeedTime 60 || true
+if [ -f "$DIR/deploy/radar-status.timer" ]; then
+  { install -m 644 "$DIR/deploy/radar-status.service" "$DIR/deploy/radar-status.timer" /etc/systemd/system/ \
+    && systemctl daemon-reload && systemctl enable -q --now radar-status.timer; } \
+    || echo "$(date '+%F %T') бот: таймер статуса не включился"
+fi
 
 # страница настройки: https://<домен>:8443/<ключ>/ — через nginx, с тем же сертификатом, что у сайта
 SSL=/etc/ssl/novosti-max
