@@ -1,0 +1,9 @@
+[Unit]
+Description=Радар: статус бота rb-status.txt и проверка постов rb-check.txt (раз в минуту, отдельно от автообновления)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/radar-bot/deploy/status.sh
+TimeoutStartSec=120
+# прогон пробного режима (tools/replay.py) status.sh запускает в фоне — не убивать его по окончании
+KillMode=process
