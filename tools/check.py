@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from textproc import clean_text, classify, card_kind, is_ad   # noqa: E402
+from textproc import clean_text, classify, card_kind, is_ad, AD_WORDS, LINK, SUBSCRIBE_LINE   # noqa: E402
 
 TZ = ZoneInfo("Europe/Moscow")
 STATE = "/var/lib/radar-bot"
@@ -90,6 +90,19 @@ def has_url_buttons(r):
     return any(a.get("type") == "inline_keyboard" and any(b.get("url") for row in ((a.get("payload") or {}).get("buttons") or [])
                                                           for b in row)
                for a in r.get("atts") or [])
+
+
+def ad_reason(text, buttons):
+    """FIX-59 (15.11): почему бот счёл пост рекламой — чтобы по отчёту было видно, верно ли пропущено оповещение
+    («⚠️ Московская область: внимание! Идет массовая атака БПЛА», 21:26, каналы MAX Москвы — «пропуск: реклама»)."""
+    if buttons:
+        return "кнопка-ссылка"
+    body = SUBSCRIBE_LINE.sub("", text or "")
+    m = AD_WORDS.search(body)
+    if m:
+        return f"слово «{m.group(0)[:30]}»"
+    m = LINK.search(body)
+    return f"ссылка «{m.group(0)[:60]}»" if m else ""
 
 
 def check(rows, log_lines, cfg, now, hours=1.0, list_hours=3.0):
@@ -164,8 +177,11 @@ def check(rows, log_lines, cfg, now, hours=1.0, list_hours=3.0):
         for g in groups:
             if norm_link(g.get("source")) == r.get("src") and g["slug"] not in done:
                 why = pub_err.get(g["vk"])
+                ad = ad_reason(text, has_url_buttons(r)) if not why else ""
                 warn.append(f"{when} оповещение канала {r.get('src')} не вышло в {g['vk']}"
-                            f"{' (ошибка публикации)' if why else ''}: {clean_text(text).replace(chr(10), ' / ')[:70]}")
+                            f"{' (ошибка публикации)' if why else ''}"
+                            f"{f' (бот счёл рекламой: {ad}; текст MAX: ' + text.replace(chr(10), ' / ')[:300] + ')' if ad else ''}"
+                            f": {clean_text(text).replace(chr(10), ' / ')[:70]}")
 
     lines.append(f"⚠ подозрительных постов: {len(warn)}" if warn else "подозрительных постов нет")
     lines += ["  ⚠ " + w for w in warn]
