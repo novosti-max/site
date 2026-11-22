@@ -260,3 +260,26 @@
     requestAnimationFrame(tick);
   });
 })();
+
+// цели Метрики: нажатия на контакты и заявку. Без согласия Метрика не запущена, и цели не уходят
+(() => {
+  const goal = name => {
+    if (typeof window.ym !== "function" || !window.nmMetrikaId) return;
+    ym(window.nmMetrikaId, "reachGoal", name);
+  };
+  document.addEventListener("click", e => {
+    const t = e.target.closest("a[href], [data-open-request], [data-copy-req]");
+    if (!t) return;
+    if (t.hasAttribute("data-open-request")) return goal("request_open");
+    if (t.hasAttribute("data-copy-req")) return goal("request_copy");
+    const href = t.getAttribute("href");
+    // ссылки на сами каналы в каталоге — не контакт
+    if (t.closest(".ch")) return;
+    const kind = href.startsWith("mailto:") ? "contact_email"
+      : href.startsWith("https://t.me/") ? "contact_telegram"
+      : href.startsWith("https://max.ru/") ? "contact_max" : null;
+    if (!kind) return;
+    goal(kind);
+    goal("contact");
+  }, true);
+})();
