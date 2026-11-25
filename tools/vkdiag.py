@@ -53,8 +53,7 @@ def main():
         try:
             ip = requests.get("https://api64.ipify.org", timeout=10).text.strip()
         except Exception as e:
-            lines.append(f"{fam_name}: внешнего адреса нет ({type(e).__name__}) — проверка пропущена")
-            continue
+            ip = f"не узнать ({type(e).__name__})"
         lines.append(f"{fam_name}: внешний адрес сервера {ip}")
         for slug in SLUGS:
             g, tok = groups.get(slug), s.get("vk", {}).get(slug)
