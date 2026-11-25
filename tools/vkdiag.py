@@ -3,15 +3,18 @@
 
 Ничего не публикует: wall.post вызывается БЕЗ текста и вложений — если ключ принят, ВК отвечает
 ошибкой 100 «параметр не задан», если не принят — ошибкой 5. Так видно, на каком шаге отказ.
-Проверяет оба адреса API (api.vk.ru и api.vk.com) и внешний IP сервера. Ключи не печатает.
+Проверяет оба адреса API (api.vk.ru и api.vk.com), по IPv4 и по IPv6 (другой адрес сервера), и внешний IP. Ключи не печатает.
 Запуск: python3 tools/vkdiag.py --out rb-vkdiag.txt [--secrets /etc/radar-bot/secrets.json]
 """
 import argparse, json, os, sys, time
 
-import requests, yaml
+import socket
+
+import requests, urllib3.util.connection as u3c, yaml
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOSTS = ("https://api.vk.ru/method/", "https://api.vk.com/method/")
+FAMILIES = (("IPv4", socket.AF_INET), ("IPv6", socket.AF_INET6))   # 25.11: пробуем другой IP сервера — IPv6, если он есть
 SLUGS = ("russia", "samara")   # ключи этих групп Никита заменил 25.11
 
 
@@ -45,21 +48,25 @@ def main():
     cfg = yaml.safe_load(open(os.path.join(HERE, "config.yaml"), encoding="utf-8"))
     groups = {g["slug"]: g for g in cfg["groups"]}
     lines = [time.strftime("%Y-%m-%d %H:%M:%S") + " диагностика ключей ВК (ничего не публикует)"]
-    try:
-        lines.append("внешний IP сервера: " + requests.get("https://api.ipify.org", timeout=10).text.strip())
-    except Exception as e:
-        lines.append(f"внешний IP сервера: не узнать ({type(e).__name__})")
-    for slug in SLUGS:
-        g, tok = groups.get(slug), s.get("vk", {}).get(slug)
-        if not g or not tok:
-            lines.append(f"{slug}: нет группы или ключа")
+    for fam_name, fam in FAMILIES:
+        u3c.allowed_gai_family = lambda fam=fam: fam
+        try:
+            ip = requests.get("https://api64.ipify.org", timeout=10).text.strip()
+        except Exception as e:
+            lines.append(f"{fam_name}: внешнего адреса нет ({type(e).__name__}) — проверка пропущена")
             continue
-        for host in HOSTS:
-            h = host.split("/")[2]
-            read = call(host, "groups.getById", tok, group_id=g["gid"])
-            perms = call(host, "groups.getTokenPermissions", tok)
-            post = call(host, "wall.post", tok, owner_id=-int(g["gid"]), from_group=1)
-            lines.append(f"{slug} {h}: чтение {read}; права {perms}; wall.post без текста {post}")
+        lines.append(f"{fam_name}: внешний адрес сервера {ip}")
+        for slug in SLUGS:
+            g, tok = groups.get(slug), s.get("vk", {}).get(slug)
+            if not g or not tok:
+                lines.append(f"  {slug}: нет группы или ключа")
+                continue
+            for host in HOSTS:
+                h = host.split("/")[2]
+                read = call(host, "groups.getById", tok, group_id=g["gid"])
+                perms = call(host, "groups.getTokenPermissions", tok)
+                post = call(host, "wall.post", tok, owner_id=-int(g["gid"]), from_group=1)
+                lines.append(f"  {slug} {h}: чтение {read}; права {perms}; wall.post без текста {post}")
     open(a.out + ".tmp", "w", encoding="utf-8").write("\n".join(lines) + "\n")
     os.replace(a.out + ".tmp", a.out)
 
