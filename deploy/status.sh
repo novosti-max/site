@@ -97,6 +97,14 @@ if [ -f "$DIR/tools/check.py" ]; then
     || echo "$(date '+%F %T') проверка постов: tools/check.py не отработал" > "$(dirname "$OUT")/rb-check.txt"
 fi
 
+# Диагностика ключей ВК (25.11, tools/vkdiag.py): wall.post без текста (ничего не публикует) на api.vk.ru и api.vk.com,
+# внешний IP сервера. Отчёт rb-vkdiag.txt рядом с rb-status.txt, раз в 10 мин. Ключи не печатает.
+VD=$(dirname "$OUT")/rb-vkdiag.txt
+if [ -f "$DIR/tools/vkdiag.py" ] && { [ ! -f "$VD" ] || [ -n "$(find "$VD" -mmin +10)" ]; }; then
+  timeout 60 python3 "$DIR/tools/vkdiag.py" --out "$VD" >/dev/null 2>&1 \
+    || echo "$(date '+%F %T') диагностика ключей: tools/vkdiag.py не отработал" > "$VD"
+fi
+
 # Пробный режим нового правила: файлы в папке shadow/ ветки radar-bot боевой бот НЕ использует.
 # Сервер прогоняет через них журнал настоящих постов MAX (tools/replay.py, ВК и сеть отключены)
 # и выкладывает отчёт rb-shadow.txt: какие посты вышли бы иначе. Раз в 30 мин или сразу после изменения shadow/.
