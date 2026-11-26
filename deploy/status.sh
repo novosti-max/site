@@ -97,6 +97,13 @@ if [ -f "$DIR/tools/check.py" ]; then
     || echo "$(date '+%F %T') проверка постов: tools/check.py не отработал" > "$(dirname "$OUT")/rb-check.txt"
 fi
 
+# Проверка канала ВК Самары (26.11, tools/vkchan.py): один раз, ничего не публикует. Отчёт rb-vkchan.txt.
+VC=$(dirname "$OUT")/rb-vkchan.txt
+if [ -f "$DIR/tools/vkchan.py" ] && [ ! -f "$VC" ]; then
+  timeout 90 python3 "$DIR/tools/vkchan.py" "$VC" >/dev/null 2>&1 \
+    || echo "$(date '+%F %T') проверка канала: tools/vkchan.py не отработал" > "$VC"
+fi
+
 # Пробный режим нового правила: файлы в папке shadow/ ветки radar-bot боевой бот НЕ использует.
 # Сервер прогоняет через них журнал настоящих постов MAX (tools/replay.py, ВК и сеть отключены)
 # и выкладывает отчёт rb-shadow.txt: какие посты вышли бы иначе. Раз в 30 мин или сразу после изменения shadow/.
