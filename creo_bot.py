@@ -156,6 +156,8 @@ def is_federal(text):
 
 
 def is_own(ch, text):
+    if ch.get("all_regions"):  # «Радар по всей России»: свой регион — вся страна
+        return True
     """Пост про наш регион: есть слово региона, или вообще нет чужой области (местные «Пулково / Опасность»).
     Смотрим без подписи канала: «Радар Санкт-Петербург и ЛО - Подписаться» есть под каждым постом."""
     t = " ".join(clean_lines(text)).lower()
@@ -167,12 +169,14 @@ def is_own(ch, text):
 def is_alert(ch, text):
     """Оповещение нашего канала: короткое, про наш регион, со словами тревоги. Новости и сводки — нет."""
     body = " ".join(clean_lines(text))
-    return (len(body) <= 300 and ALERT_RE.search(body) is not None and not is_federal(text)
-            and is_own(ch, text))
+    fed_ok = ch.get("all_regions") or not is_federal(text)
+    return len(body) <= 300 and ALERT_RE.search(body) is not None and fed_ok and is_own(ch, text)
 
 
 def own_shot(ch, text):
     """Сбитые — только в предложении про наш регион и не из общероссийской сводки."""
+    if ch.get("all_regions"):
+        return shot_of(" ".join(clean_lines(text)))
     if is_federal(text):
         return None
     for sent in re.split(r"(?<=[.!?])\s+", "\n".join(clean_lines(text))):
@@ -205,7 +209,7 @@ class Facts:
                 else:
                     break
             start = chain[0]["t"]
-            self.series = [r for r in rows if r["t"] >= start and not is_federal(post_text(r)) and is_own(ch, post_text(r))]
+            self.series = [r for r in rows if r["t"] >= start and (ch.get("all_regions") or not is_federal(post_text(r))) and is_own(ch, post_text(r))]
         last_d = dangers[-1]["t"] if dangers else None
         after = [c for c in clears if last_d and c["t"] > last_d]
         self.clear = after[0] if after else None
@@ -347,8 +351,7 @@ class Writer:
         self.tpl, self.rot = tpl, rot
 
     def pick(self, key, items, have):
-        ok = [x for x in items if all(n in have for n in (x.get("need") or []))] if items and isinstance(items[0], dict) \
-            else list(items)
+        ok = [x for x in items or [] if not isinstance(x, dict) or all(n in have for n in (x.get("need") or []))]
         if not ok:
             return ""
         i = self.rot.get(key, 0) % len(ok)
@@ -361,6 +364,7 @@ class Writer:
         v = dict(ch)
         v["link"] = norm_link(ch["link"])
         v["name"] = ch["name"]
+        v["area"] = "всем регионам страны" if ch.get("all_regions") else f"{ch['city_dat']} и области"
         if f.shot:
             v.update(shot=str(f.shot), shot_word=plural(f.shot, "беспилотник", "беспилотника", "беспилотников"),
                      shot_verb=plural(f.shot, "сбит", "сбиты", "сбиты"),
@@ -420,6 +424,8 @@ class Writer:
             h.add("active")  # отбоя не было — можно писать «опасность» в настоящем времени
         if f.places:
             h.add("places")
+        if not (v or {}).get("all_regions"):
+            h.add("regional")
         if f.first and ((f.clear["t"] if f.clear else f.now * 1000) - f.first["t"]) >= 2 * 3600 * 1000:
             h.add("dur")
         if v is not None and v["when"] == "ночью":
@@ -469,6 +475,12 @@ class Writer:
             b.append(f"▪️ Тревога с {v['first_time']}" + (f" до {v['clear_time']}" if f.clear else ", отбоя пока нет"))
         cta = self.line(f"su:c:{ch['key']}", t["cta"][net], have, v)
         return "\n\n".join([head, "\n".join(b), cta, t["link"].format_map(v)])
+
+    def evergreen(self, ch, f, tz):
+        v = self.vars(ch, f, tz)
+        t = self.tpl["evergreen"]
+        text = self.line(f"ev:{ch['key']}", t[ch["network"]], self.have(f, v), v)
+        return text + "\n\n" + t["link"].format_map(v)
 
     def vk(self, kind, ch, f, tz):
         v = self.vars(ch, f, tz)
@@ -594,17 +606,19 @@ class Creo:
         now = now or time.time()
         rows = self.feed(ch)
         f = Facts(ch, rows, now, float(self.cfg.get("feed_hours", 12)))
+        button = f"{ch['button']}👈 - https://{norm_link(ch['link'])}"
         if not f.series:
-            return [(f"За последние {self.cfg.get('feed_hours', 12)} ч в «{ch['name']}» не было оповещений — "
-                     f"собрать крео по атаке не из чего. Если бот не админ в этом канале, он не видит его посты.",
-                     None, False)]
+            note = (f"За последние {self.cfg.get('feed_hours', 12)} ч в «{ch['name']}» не было оповещений, поэтому крео "
+                    f"без цифр атаки — на тихое время." if rows else
+                    f"Бот пока не видит постов «{ch['name']}» — добавьте «Помощник сети Радар» админом без прав в этот "
+                    f"канал. Пока — крео без цифр атаки, на тихое время.")
+            return [(self.writer.evergreen(ch, f, self.tz), None, True), (button, None, False), (note, None, False)]
         local = dt.datetime.fromtimestamp(now, self.tz)
         img = None
         if req["kind"] in ("max_zakup", "vk_story", "vk_pereliv"):
             chat_id = (rows[-1] if rows else {}).get("chat")
             img = creo_render.lockscreen(f.notes(), ch["name"], self.avatar(chat_id), local.strftime("%H:%M"),
                                          f"{DAYS[local.weekday()]}, {local.day} {MONTHS[local.month - 1]}")
-        button = f"{ch['button']}👈 - https://{norm_link(ch['link'])}"
         facts = "Факты из ленты «" + ch["name"] + "» (проверьте перед публикацией):\n" + "\n".join(f.used_posts(self.tz))
         if req["kind"] == "max_zakup":
             return [(self.writer.max_zakup(ch, f, self.tz), img, True), (button, None, False), (facts, None, False)]

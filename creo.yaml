@@ -48,7 +48,7 @@ channels:
      place: "Башкирия", city: "Уфа", city_loc: "Уфе", city_acc: "Уфу", city_dat: "Уфе",
      region_ins: "Башкирией", region_loc: "Башкирии", airport: "Уфа",
      words: ["уф", "башк"]}
-  - {key: russia_ilya, place_acc: "Россию",  network: ilya, link: "max.ru/radar_russia_bpla", name: "Радар по всей России", button: "Тревоги по всей России",
+  - {key: russia_ilya, all_regions: true, place_acc: "Россию",  network: ilya, link: "max.ru/radar_russia_bpla", name: "Радар по всей России", button: "Тревоги по всей России",
      place: "Россия", city: "Россия", city_loc: "России", city_acc: "Россию", city_dat: "России",
      region_ins: "регионами России", region_loc: "регионах России", airport: "",
      words: ["росси", "рф", "всей"]}
