@@ -8,7 +8,8 @@ timezone: "Europe/Moscow"
 
 # Кто может пользоваться. id — MAX user_id: человек пишет боту что угодно, бот отвечает «Ваш ID: …».
 # networks — каналы каких сетей ему доступны (andrey, ilya).
-users: []
+users:
+  - {id: 6224742, name: "Никита", networks: [andrey, ilya]}
 #  - {id: 123456789, name: "Никита", networks: [andrey, ilya]}
 
 networks:
