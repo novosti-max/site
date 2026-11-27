@@ -90,6 +90,13 @@ _w = creo_bot.Writer(tpl, {})
 _heads = [ _w.max_zakup(spb, f, tz).split("\n")[0] for _ in range(4)]
 check(len(set(_heads)) >= 3, "заголовки чередуются")
 
+# «Радар по всей России»: все регионы свои; пустая лента — пост на тихое время, а не отказ
+rus = next(x for x in cfg["channels"] if x["key"] == "russia_ilya")
+check(creo_bot.is_own(rus, "Новгородская область - опасность по БПЛА"), "для России любой регион свой")
+_m = c.build({"kind": "max_zakup"}, rus, now)
+check(len(_m) == 3 and "<b>" in _m[0][0] and _m[1][0].startswith("Тревоги по всей России👈 - https://max.ru/radar_russia_bpla"), "пустая лента — вечный пост + кнопка")
+check("области" not in _m[0][0].split("\n")[0] and " и области" not in _m[0][0], "для России нет «и области»")
+
 # хук: пишет личку и ленту, ошибки не выпускает
 with tempfile.TemporaryDirectory() as d:
     creo_hook.record({"recipient": {"chat_type": "dialog", "chat_id": 5}, "sender": {"user_id": 7, "name": "А"},
