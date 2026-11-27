@@ -62,6 +62,34 @@ check(creo_bot.is_federal("уничтожено 318 БПЛА над террит
 check(not creo_bot.is_own(spb, "Беспилотники атаковали Нижегородскую область"), "чужая область — не наша")
 check(creo_bot.is_own(spb, "Пулково\nОпасность по БПЛА"), "местное без области — наше")
 
+# банк текстов: ни один кусок не оставляет «{…}», нет запрещённых слов, сети не повторяют друг друга
+import re as _re
+_v = creo_bot.Writer.vars(spb, f, tz)
+def _walk(x):
+    if isinstance(x, dict):
+        if "text" in x:
+            yield x["text"]
+        else:
+            for y in x.values():
+                yield from _walk(y)
+    elif isinstance(x, list):
+        for y in x:
+            yield from _walk(y)
+    elif isinstance(x, str):
+        yield x
+_all = list(_walk(tpl))
+for _t in _all:
+    _out = _t.format_map(_v)
+    check(not _re.search(r"[{}]", _out), "банк: всё подставилось — " + _t[:40])
+    for bad in ("vpn", "белые списки", "белых списк", "обязан"):
+        check(bad not in _out.lower(), "банк без «" + bad + "»")
+_a = set(_walk(tpl["max_zakup"]["cta"]["andrey"])); _i = set(_walk(tpl["max_zakup"]["cta"]["ilya"]))
+check(not (_a & _i), "призывы сетей не совпадают")
+# повторов подряд нет
+_w = creo_bot.Writer(tpl, {})
+_heads = [ _w.max_zakup(spb, f, tz).split("\n")[0] for _ in range(4)]
+check(len(set(_heads)) >= 3, "заголовки чередуются")
+
 # хук: пишет личку и ленту, ошибки не выпускает
 with tempfile.TemporaryDirectory() as d:
     creo_hook.record({"recipient": {"chat_type": "dialog", "chat_id": 5}, "sender": {"user_id": 7, "name": "А"},
