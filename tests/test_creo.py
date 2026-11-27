@@ -54,6 +54,14 @@ for bad in ("VPN", "белые списки", "белых списк", "обяз
 f2 = creo_bot.Facts(spb, c.feed(spb), dt.datetime(2026, 11, 27, 8, 50, tzinfo=tz).timestamp(), 12)
 check(f2.clear is not None and not f2.ongoing, "после 08:37 — отбой")
 
+# 27.11: сводка МО «318 БПЛА над территориями…» и новость про другой регион не ломают крео Питера
+f3 = creo_bot.Facts(spb, c.feed(spb), dt.datetime(2026, 11, 27, 11, 9, tzinfo=tz).timestamp(), 12)
+check(f3.shot == 44, "318 из общероссийской сводки не берём")
+check(f3.clear is not None and not f3.ongoing, "новость про Кстово в 10:57 — не тревога, атака закончилась отбоем 08:37")
+check(creo_bot.is_federal("уничтожено 318 БПЛА над территориями: Брянской области; Ленинградской области;"), "сводка МО — федеральная")
+check(not creo_bot.is_own(spb, "Беспилотники атаковали Нижегородскую область"), "чужая область — не наша")
+check(creo_bot.is_own(spb, "Пулково\nОпасность по БПЛА"), "местное без области — наше")
+
 # хук: пишет личку и ленту, ошибки не выпускает
 with tempfile.TemporaryDirectory() as d:
     creo_hook.record({"recipient": {"chat_type": "dialog", "chat_id": 5}, "sender": {"user_id": 7, "name": "А"},
