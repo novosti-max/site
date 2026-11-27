@@ -139,6 +139,50 @@ def first_sentence(text, limit=60):
     return s if len(s) <= limit else s[:limit].rsplit(" ", 1)[0] + "…"
 
 
+REGION_RE = re.compile(r"\w+(?:ск|цк)(?:ой|ая|ую|ий|ого|ом|ие|их)\s+(?:област|кра[йюяе]|республик)|республик\w*\s+\w+", re.I)
+ALERT_RE = re.compile(r"(?<!без)опасност|угроз|тревог|фиксац|работа пво|сбити|сбит|сбил|укрыт|отой[дт]\w* от окон|"
+                      r"ракетн|атак|бпла|беспилотн|дрон", re.I)
+
+
+def own_words(ch):
+    return [w.strip() for w in ch.get("words", []) if len(w.strip()) >= 3]
+
+
+def is_federal(text):
+    """27.11: сводка МО «318 БПЛА над территориями: Брянской…, Ленинградской…» — не про наш регион, в крео не берём."""
+    t = text.lower()
+    regions = {m.group(0).split()[0] for m in REGION_RE.finditer(t)}
+    return "над территори" in t or "регионами россии" in t or len(regions) >= 3
+
+
+def is_own(ch, text):
+    """Пост про наш регион: есть слово региона, или вообще нет чужой области (местные «Пулково / Опасность»).
+    Смотрим без подписи канала: «Радар Санкт-Петербург и ЛО - Подписаться» есть под каждым постом."""
+    t = " ".join(clean_lines(text)).lower()
+    if any(w in t for w in own_words(ch)):
+        return True
+    return not REGION_RE.search(t)
+
+
+def is_alert(ch, text):
+    """Оповещение нашего канала: короткое, про наш регион, со словами тревоги. Новости и сводки — нет."""
+    body = " ".join(clean_lines(text))
+    return (len(body) <= 300 and ALERT_RE.search(body) is not None and not is_federal(text)
+            and is_own(ch, text))
+
+
+def own_shot(ch, text):
+    """Сбитые — только в предложении про наш регион и не из общероссийской сводки."""
+    if is_federal(text):
+        return None
+    for sent in re.split(r"(?<=[.!?])\s+", "\n".join(clean_lines(text))):
+        if any(w in sent.lower() for w in own_words(ch)):
+            n = shot_of(sent)
+            if n:
+                return n
+    return None
+
+
 class Facts:
     """Что было в канале за последние часы: серия оповещений, сбитые, аэропорт, цитата, уведомления для картинки."""
 
@@ -149,8 +193,9 @@ class Facts:
         rows = [r for r in rows if post_text(r).strip() and not SKIP_RE.search(post_text(r))]
         rows.sort(key=lambda r: r["t"])
         self.rows = rows
-        dangers = [r for r in rows if DANGER_RE.search(post_text(r)) and not CLEAR_RE.search(post_text(r))]
-        clears = [r for r in rows if CLEAR_RE.search(post_text(r))]
+        alerts = [r for r in rows if is_alert(ch, post_text(r))]
+        dangers = [r for r in alerts if not CLEAR_RE.search(post_text(r))]
+        clears = [r for r in alerts if CLEAR_RE.search(post_text(r))]
         self.series = []
         if dangers:
             chain = [dangers[-1]]
@@ -160,15 +205,16 @@ class Facts:
                 else:
                     break
             start = chain[0]["t"]
-            self.series = [r for r in rows if r["t"] >= start]
+            self.series = [r for r in rows if r["t"] >= start and not is_federal(post_text(r)) and is_own(ch, post_text(r))]
         last_d = dangers[-1]["t"] if dangers else None
         after = [c for c in clears if last_d and c["t"] > last_d]
         self.clear = after[0] if after else None
-        self.ongoing = bool(last_d) and not self.clear
+        # «атака идёт» — только если последнее оповещение свежее 3 ч и отбоя после него не было
+        self.ongoing = bool(last_d) and not self.clear and now - last_d / 1000 <= 3 * 3600
         self.first = self.series[0] if self.series else None
         self.shot, self.shot_row = None, None
         for r in reversed(self.series):
-            n = shot_of(post_text(r))
+            n = own_shot(ch, post_text(r))
             if n:
                 self.shot, self.shot_row = n, r
                 break
@@ -216,7 +262,7 @@ class Facts:
                 subs.append("самолёты уходили на запасной")
             sub = ", ".join(subs) if subs else "Ограничения на приём и выпуск рейсов"
             return {"title": title, "sub": sub[0].upper() + sub[1:], "red": True}
-        if shot_of(t):  # более ранняя сводка сбитых: показываем только то, что в ней ещё важного (угроза городу)
+        if own_shot(ch, t):  # более ранняя сводка сбитых: показываем только то, что в ней ещё важного (угроза городу)
             if re.search(r"угроз", t, re.I) and re.search(ch["city_loc"][:6], t, re.I):
                 sub = "Возможны сбои мобильного интернета" if "интернет" in t.lower() else attr_of(t).strip().capitalize()
                 return {"title": f"Угроза БПЛА объявлена в {ch['city_loc']}", "sub": sub, "red": True}
