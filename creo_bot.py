@@ -232,6 +232,14 @@ class Facts:
             if q:
                 self.quote, self.quote_row = q, r
                 break
+        # районы из оповещений серии: «Всеволожский район», «Кировский район»… (до 3, по первому упоминанию)
+        self.places = []
+        for r in self.series:
+            for line in clean_lines(post_text(r)):
+                m = re.match(r"^([А-ЯЁ][а-яё-]+(?:ский|цкий|ской|цкой))\s+район", line)
+                if m and m.group(1) not in self.places:
+                    self.places.append(m.group(1))
+        self.places = self.places[:3]
 
     def hm(self, r, tz):
         return dt.datetime.fromtimestamp(r["t"] / 1000, tz).strftime("%H:%M")
@@ -352,16 +360,18 @@ class Writer:
     def vars(ch, f, tz):
         v = dict(ch)
         v["link"] = norm_link(ch["link"])
+        v["name"] = ch["name"]
         if f.shot:
             v.update(shot=str(f.shot), shot_word=plural(f.shot, "беспилотник", "беспилотника", "беспилотников"),
                      shot_verb=plural(f.shot, "сбит", "сбиты", "сбиты"),
                      shot_adj=plural(f.shot, "сбитый беспилотник", "сбитых беспилотника", "сбитых беспилотников"))
             attr = attr_of(post_text(f.shot_row))
+            v["shot_attr"] = attr
             v["shot_sentence"] = f". Над областью {v['shot_verb']} {f.shot} {v['shot_word']}{attr}."
             v["shot_sentence_cap"] = f"Над {ch['region_ins']} {v['shot_verb']} {f.shot} {v['shot_word']}{attr}. "
         else:
-            v["shot_sentence"], v["shot_sentence_cap"] = ".", ""
-        v["ongoing_sentence"] = " Боевая работа продолжается." if f.ongoing and f.shot and "продолжа" in post_text(f.shot_row).lower() else ""
+            v["shot_sentence"], v["shot_sentence_cap"], v["shot_attr"] = ".", "", ""
+        v["ongoing_sentence"] = " Опасность сохраняется." if f.ongoing else ""
         v["first_time"] = f.hm(f.first, tz) if f.first else ""
         v["clear_time"] = f.hm(f.clear, tz) if f.clear else ""
         v["airport_name"] = f.airport_name
@@ -374,13 +384,27 @@ class Writer:
             v["quote_lead"] = (f"В {v['quote_time']} у подписчиков «{ch['name']}» в MAX высветилось: «{f.quote}».\n\n")
         else:
             v["quote_sentence"], v["quote_lead"] = "", ""
+        # когда началось и сколько длилось
+        h = dt.datetime.fromtimestamp(f.first["t"] / 1000, tz).hour if f.first else 3
+        when = "ночью" if h < 6 else "утром" if h < 12 else "днём" if h < 18 else "вечером"
+        v["when"], v["When"] = when, when.capitalize()
+        end = f.clear["t"] / 1000 if f.clear else f.now
+        hours = int((end - f.first["t"] / 1000) // 3600) if f.first else 0
+        v["dur_nom"] = f"{hours} {plural(hours, 'час', 'часа', 'часов')}" if hours >= 2 else ""
+        v["dur_gen"] = f"{hours} {plural(hours, 'часа', 'часов', 'часов')}" if hours >= 2 else ""
         big = (f.shot or 0) >= 20
-        v["attack"], v["attack_gen"] = ("массированной", "массированной") if big else ("ночной", "ночной")
-        for k in ("city", "region_ins", "quote", "shot_word", "airport_name", "place"):
+        adj = {"ночью": "ночн", "утром": "утренн", "днём": "дневн", "вечером": "вечерн"}[when]
+        v["attack"] = "массированной" if big else adj + "ей"          # «атаки» — род. п.
+        v["attack_nom"] = ("Массированная" if big else (adj + "яя").capitalize())
+        p = f.places
+        v["places_list"] = (", ".join(p[:-1]) + " и " + p[-1]) if len(p) > 1 else (p[0] if p else "")
+        v["places"] = (", ".join(p[:-1]) + " и " + p[-1] + " районы") if len(p) > 1 else (p[0] + " район" if p else "")
+        for k in ("city", "region_ins", "region_loc", "quote", "shot_word", "shot_verb", "shot_adj", "airport_name",
+                  "place", "when", "dur_nom", "places", "city_loc"):
             v[k.upper()] = (v.get(k) or "").upper()
         return SafeDict(v)
 
-    def have(self, f):
+    def have(self, f, v=None):
         h = set()
         if f.shot:
             h.add("shot")
@@ -392,50 +416,64 @@ class Writer:
             h.add("ongoing")
         if f.clear:
             h.add("clear")
+        else:
+            h.add("active")  # отбоя не было — можно писать «опасность» в настоящем времени
+        if f.places:
+            h.add("places")
+        if f.first and ((f.clear["t"] if f.clear else f.now * 1000) - f.first["t"]) >= 2 * 3600 * 1000:
+            h.add("dur")
+        if v is not None and v["when"] == "ночью":
+            h.add("night")
         return h
 
+    def line(self, key, items, have, v):
+        t = self.pick(key, items or [], have)
+        return t.format_map(v) if t else ""
+
     def max_zakup(self, ch, f, tz):
-        v, net, t = self.vars(ch, f, tz), ch["network"], self.tpl["max_zakup"]
-        head = self.pick(f"mz:h:{ch['key']}", t["headline"][net], self.have(f)).format_map(v)
-        body = []
-        if f.first:
-            body.append(f"С {v['first_time']} в {ch['region_loc']} действовала опасность по БПЛА."
-                        if not f.ongoing else f"С {v['first_time']} в {ch['region_loc']} опасность по БПЛА.")
+        v, net, t, have = self.vars(ch, f, tz), ch["network"], self.tpl["max_zakup"], None
+        have = self.have(f, v)
+        k = ch["key"]
+        head = self.line(f"mz:h:{k}", t["headline"][net], have, v)
+        body = [self.line(f"mz:lead:{k}", t["lead"][net], have, v)]
+        if f.places:
+            body.append(self.line(f"mz:pl:{k}", t["places"][net], have, v))
         if f.quote:
-            body.append(f"Жителям писали: «{f.quote}»")
+            body.append(self.line(f"mz:q:{k}", t["quote"][net], have, v))
         facts = []
         if f.shot:
-            facts.append(f"<b>Над {ch['region_ins']} {v['shot_verb']} {f.shot} {v['shot_word']}"
-                         f"{attr_of(post_text(f.shot_row))}.</b>")
+            facts.append(self.line(f"mz:s:{k}", t["shot"][net], have, v))
         if f.airport_row:
-            facts.append(f"В {f.airport_name} вводили ограничения на рейсы.")
-        if f.clear:
-            facts.append(f"Отбой дали только в {v['clear_time']}.")
-        elif f.ongoing and f.shot and "продолжа" in post_text(f.shot_row).lower():
-            facts.append("<b>Боевая работа продолжается прямо сейчас.</b>")
+            facts.append(self.line(f"mz:a:{k}", t["airport"][net], have, v))
+        if f.ongoing:
+            facts.append(self.line(f"mz:on:{k}", t["ongoing"][net], have, v))
         if facts:
-            body.append(" ".join(facts))
-        cta = self.pick(f"mz:c:{ch['key']}", t["cta"][net], set()).format_map(v)
-        return "\n\n".join([head] + body + [cta, t["link"].format_map(v)])
+            body.append(" ".join(x for x in facts if x))
+        cta = self.line(f"mz:c:{k}", t["cta"][net], have, v)
+        return "\n\n".join(x for x in [head] + body + [cta, t["link"].format_map(v)] if x)
 
     def summary(self, ch, f, tz):
-        v, net, t = self.vars(ch, f, tz), ch["network"], self.tpl["summary"]
-        head = self.pick(f"su:h:{ch['key']}", t["headline"][net], set()).format_map(v)
+        v, net, t, have = self.vars(ch, f, tz), ch["network"], self.tpl["summary"], None
+        have = self.have(f, v)
+        head = self.line(f"su:h:{ch['key']}", t["headline"][net], have, v)
         b = []
         if f.shot:
-            b.append(f"▪️ {f.shot} {v['shot_adj']} за ночь")
+            b.append(f"▪️ {f.shot} {v['shot_adj']} {v['when'] if v['when'] != 'ночью' else 'за ночь'}")
+        if f.places:
+            b.append(f"▪️ Фиксации: {v['places']}")
         if f.quote:
             b.append(f"▪️ «{f.quote}» — предупреждение жителям")
         if f.airport_row:
             b.append(f"▪️ {f.airport_name}: ограничения на рейсы")
         if f.first:
             b.append(f"▪️ Тревога с {v['first_time']}" + (f" до {v['clear_time']}" if f.clear else ", отбоя пока нет"))
-        cta = self.pick(f"su:c:{ch['key']}", t["cta"][net], set()).format_map(v)
+        cta = self.line(f"su:c:{ch['key']}", t["cta"][net], have, v)
         return "\n\n".join([head, "\n".join(b), cta, t["link"].format_map(v)])
 
     def vk(self, kind, ch, f, tz):
         v = self.vars(ch, f, tz)
-        text = self.pick(f"{kind}:{ch['key']}", self.tpl[kind][ch["network"]], set()).format_map(v)
+        text = self.line(f"{kind}:{ch['key']}", self.tpl[kind][ch["network"]], self.have(f, v), v)
+        text = "\n".join(l.rstrip() for l in text.splitlines())
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 

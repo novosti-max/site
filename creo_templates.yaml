@@ -1,49 +1,140 @@
-# Банк текстов крео-бота. Обновляет Claude по итогам утреннего анализа (с одобрения Никиты).
-# need — какие факты нужны шаблону (shot, quote, airport, ongoing, clear); без них шаблон не берётся.
-# Подстановки: {city} {city_loc} {city_acc} {city_dat} {region_ins} {region_loc} {place} {place_acc} {name} {button}
-#   {shot} {shot_word} («беспилотников») {shot_verb} («сбиты») {shot_adj} («сбитых беспилотников»)
-#   {quote} {quote_time} {first_time} {clear_time} {airport_name} {airport_cta} {link}
-#   ЗАГЛАВНЫМИ ({CITY}, {REGION_INS}, {QUOTE}, {SHOT_WORD}, {AIRPORT_NAME}) — то же капсом.
-# Формулировки сетей Андрея и Ильи не пересекаются.
+# Банк текстов крео-бота. Пишет и пополняет Claude (по итогам утреннего анализа, с одобрения Никиты).
+# Бот берёт факты из ленты наших каналов и собирает пост из этих кусков, по кругу, чтобы не повторяться.
+# need — какие факты нужны куску: shot (сбитые), quote («отойдите от окон»), airport (ограничения в аэропорту),
+#   ongoing (атака идёт, оповещение свежее 3 ч), clear (был отбой), places (районы), dur (длилось 2+ ч), night (ночью).
+# Подстановки: {city} {city_loc} {city_acc} {city_dat} {region_ins} {region_loc} {place} {place_acc} {name} {link}
+#   {shot} {shot_word} {shot_verb} {shot_adj} {shot_attr} {quote} {quote_time} {first_time} {clear_time}
+#   {airport_name} {airport_cta} {when} {When} {dur_nom} («7 часов») {dur_gen} («7 часов» после «больше»)
+#   {places} («Всеволожский и Кировский районы») {attack} («массированной») {attack_nom} («Массированная»)
+#   ЗАГЛАВНЫМИ ({CITY}, {REGION_INS}, {REGION_LOC}, {QUOTE}, {SHOT_WORD}, {SHOT_VERB}, {SHOT_ADJ}, {AIRPORT_NAME},
+#   {WHEN}, {DUR_NOM}, {PLACES}, {CITY_LOC}) — то же капсом.
+# Правила: факты только из ленты; без «VPN», «белых списков», «обязан»; не спрашивать, где слышали взрывы/работу ПВО;
+# формулировки сетей Андрея (⚠️) и Ильи (🚨) не пересекаются.
 
 max_zakup:
   headline:
     andrey:
-      - {need: [shot, ongoing], text: "⚠️ <b>ВНИМАНИЕ, {CITY}! {shot} {SHOT_WORD} СБИЛИ ЗА НОЧЬ — АТАКА ЕЩЁ ИДЁТ</b>"}
-      - {need: [shot], text: "⚠️ <b>ВНИМАНИЕ, {CITY}! ЗА НОЧЬ СБИЛИ {shot} {SHOT_WORD}</b>"}
-      - {need: [airport], text: "⚠️ <b>{CITY}: ДРОНЫ, ПВО И ОГРАНИЧЕНИЯ В {AIRPORT_NAME}</b>"}
-      - {need: [], text: "⚠️ <b>ВНИМАНИЕ! НАД {REGION_INS} ОПАСНОСТЬ ПО БПЛА</b>"}
+      - {need: [shot, ongoing], text: "⚠️ <b>ВНИМАНИЕ, {CITY}! {shot} {SHOT_WORD} СБИЛИ — АТАКА ЕЩЁ ИДЁТ</b>"}
+      - {need: [shot], text: "⚠️ <b>{CITY}: {shot} {SHOT_WORD} {SHOT_VERB} {WHEN}</b>"}
+      - {need: [shot, dur], text: "⚠️ <b>{DUR_NOM} ПОД ДРОНАМИ: НАД {REGION_INS} {SHOT_VERB} {shot} {SHOT_WORD}</b>"}
+      - {need: [ongoing], text: "⚠️ <b>ВНИМАНИЕ, {CITY}! ДРОНЫ НАД {REGION_INS} ПРЯМО СЕЙЧАС</b>"}
+      - {need: [airport], text: "⚠️ <b>{CITY}: ДРОНЫ, РАБОТА ПВО И ОГРАНИЧЕНИЯ В {AIRPORT_NAME}</b>"}
+      - {need: [quote], text: "⚠️ <b>«{QUOTE}» — {CITY} {WHEN} ПОД АТАКОЙ ДРОНОВ</b>"}
+      - {need: [clear, dur], text: "⚠️ <b>ОТБОЙ ТОЛЬКО В {clear_time}: {DUR_NOM} ОПАСНОСТИ НАД {REGION_INS}</b>"}
+      - {need: [places], text: "⚠️ <b>{PLACES}: ФИКСАЦИИ БПЛА {WHEN}</b>"}
+      - {need: [active], text: "⚠️ <b>ВНИМАНИЕ! НАД {REGION_INS} ОПАСНОСТЬ ПО БПЛА</b>"}
+      - {need: [active], text: "⚠️ <b>{CITY}, ЭТО КАСАЕТСЯ ВСЕХ: ДРОНЫ НАД {REGION_INS}</b>"}
+      - {need: [clear], text: "⚠️ <b>{CITY}, ОТБОЙ — НО ВОТ ЧТО БЫЛО {WHEN}</b>"}
     ilya:
-      - {need: [quote], text: "🚨 <b>{CITY}: «{QUOTE}» — НОЧЬЮ НА ГОРОД ШЛИ ДРОНЫ</b>"}
-      - {need: [shot], text: "🚨 <b>{shot} {SHOT_WORD} НАД {REGION_INS}: ЧТО БЫЛО НОЧЬЮ</b>"}
+      - {need: [quote], text: "🚨 <b>{CITY}: «{QUOTE}» — {WHEN} НА ГОРОД ШЛИ ДРОНЫ</b>"}
+      - {need: [shot], text: "🚨 <b>{shot} {SHOT_WORD} НАД {REGION_INS}: ЧТО БЫЛО {WHEN}</b>"}
       - {need: [ongoing], text: "🚨 <b>{CITY}: АТАКА ДРОНОВ ПРОДОЛЖАЕТСЯ</b>"}
-      - {need: [], text: "🚨 <b>НОЧЬ БЕЗ СНА: ДРОНЫ НАД {REGION_INS}</b>"}
+      - {need: [night], text: "🚨 <b>НОЧЬ БЕЗ СНА: ДРОНЫ НАД {REGION_INS}</b>"}
+      - {need: [shot, airport], text: "🚨 <b>{shot} {SHOT_ADJ} И ОГРАНИЧЕНИЯ В {AIRPORT_NAME}: ЧТО ПРОИЗОШЛО</b>"}
+      - {need: [dur], text: "🚨 <b>{DUR_NOM} ТРЕВОГИ В {REGION_LOC}: КАК ЭТО БЫЛО</b>"}
+      - {need: [places], text: "🚨 <b>{PLACES} — ДРОНЫ ФИКСИРОВАЛИ {WHEN}</b>"}
+      - {need: [], text: "🚨 <b>{CITY}, ВЫ ЗНАЕТЕ, ЧТО ПРОИСХОДИЛО {WHEN}?</b>"}
+      - {need: [clear, night], text: "🚨 <b>ОТБОЙ В {REGION_LOC}, НО НОЧЬ БЫЛА ТЯЖЁЛОЙ</b>"}
+      - {need: [], text: "🚨 <b>ДРОНЫ НАД {REGION_INS}: ГЛАВНОЕ, ЧТО НУЖНО ЗНАТЬ</b>"}
+  lead:
+    andrey:
+      - {need: [ongoing], text: "С {first_time} в {region_loc} опасность по БПЛА, отбоя пока нет."}
+      - {need: [clear], text: "Опасность по БПЛА в {region_loc} объявили в {first_time}, отбой — только в {clear_time}."}
+      - {need: [clear, dur], text: "Больше {dur_gen} в {region_loc} действовал режим опасности: с {first_time} до {clear_time}."}
+      - {need: [], text: "С {first_time} в {region_loc} действовала опасность по БПЛА."}
+    ilya:
+      - {need: [ongoing], text: "Первая тревога пришла в {first_time} — и она до сих пор не снята."}
+      - {need: [clear, dur], text: "Тревога длилась {dur_nom}: с {first_time} до {clear_time}."}
+      - {need: [night], text: "Пока город спал, в {first_time} пришло первое предупреждение."}
+      - {need: [], text: "Первое предупреждение в {region_loc} пришло в {first_time}."}
+  places:
+    andrey:
+      - "Фиксации: {places}."
+      - "Дроны фиксировали над районами: {places_list}."
+    ilya:
+      - "В оповещениях канала звучали {places}."
+      - "Районы с фиксациями: {places_list}."
+  quote:
+    andrey:
+      - "Жителям писали: «{quote}»"
+      - "В {quote_time} в канале вышло: «{quote}»"
+    ilya:
+      - "В {quote_time} подписчикам пришло: «{quote}»"
+      - "Было и такое предупреждение: «{quote}»"
+  shot:
+    andrey:
+      - "<b>Над {region_ins} {shot_verb} {shot} {shot_word}{shot_attr}.</b>"
+      - "<b>{shot} {shot_word} {shot_verb}{shot_attr}.</b>"
+    ilya:
+      - "<b>{shot} {shot_word} {shot_verb} над {region_ins}{shot_attr}.</b>"
+      - "<b>Итог на этот час: {shot} {shot_adj}{shot_attr}.</b>"
+  airport:
+    andrey:
+      - "В {airport_name} вводили ограничения на рейсы."
+      - "{airport_name} работал с ограничениями."
+    ilya:
+      - "Аэропорт {airport_name} принимал и выпускал рейсы с ограничениями."
+      - "В {airport_name} задерживали рейсы."
+  ongoing:
+    andrey:
+      - "<b>Опасность сохраняется прямо сейчас.</b>"
+      - "<b>Отбоя ещё не было.</b>"
+    ilya:
+      - "<b>Атака ещё не закончилась.</b>"
+      - "<b>Тревога продолжается.</b>"
   cta:
     andrey:
       - "❗️ Не узнавайте об атаке последним. Тревога, отбой, районы с фиксациями{airport_cta} — в «{name}» сразу, как их объявляют."
       - "❗️ Тревога и отбой по {city_dat} и области — в «{name}» в ту же минуту, а не утром из новостей."
+      - "❗️ Пока лента новостей догоняет, в «{name}» уже пишут, где фиксируют дроны и когда отбой."
+      - "❗️ Одно уведомление — и вы знаете, что происходит над {region_ins}. Подпишитесь на «{name}» и включите звук."
+      - "❗️ Районы, сбития, отбой{airport_cta} — всё по {city_dat} и области в одном канале: «{name}»."
+      - "❗️ Сохраните себе «{name}» — в следующий раз узнаете первыми."
     ilya:
       - "❗️ Вы в {city_loc} или области? Подпишитесь на свой радар: тревога, сбития, районы{airport_cta} приходят сразу, как их объявляют."
       - "❗️ Пока одни узнают об атаке утром, подписчики «{name}» получают тревогу в момент объявления — с районами и отбоем."
+      - "❗️ Живёте в {city_loc} или рядом? Радар присылает каждую тревогу и отбой отдельным уведомлением — подпишитесь, пока тихо."
+      - "❗️ Перешлите этот пост родным в {city_loc}: пусть тоже узнают о тревоге сразу, а не по утренним новостям."
+      - "❗️ Каждое предупреждение и каждый отбой — в «{name}». Без лишнего, только по {city_dat} и области."
+      - "❗️ Подпишитесь сейчас — в следующую тревогу уведомление придёт само."
   link: "👉 <a href=\"https://{link}\">{name}</a>"
 
 summary:
   headline:
-    andrey: ["<b>Последствия {attack} атаки БПЛА на {place_acc}</b>"]
-    ilya: ["<b>Что осталось после {attack_gen} атаки БПЛА на {place_acc}</b>"]
+    andrey:
+      - "<b>Последствия {attack} атаки БПЛА на {place_acc}</b>"
+      - "<b>Итоги {attack} атаки БПЛА на {place_acc}</b>"
+      - "<b>{When} над {region_ins}: что известно после атаки</b>"
+    ilya:
+      - "<b>{attack_nom} атака на {place_acc}: главное</b>"
+      - "<b>Что осталось после {attack} атаки БПЛА на {place_acc}</b>"
+      - "<b>Атака дронов на {place_acc}: коротко о главном</b>"
   cta:
-    andrey: ["<b>Всё велось в «{name}»:</b> тревоги, районы, сбития и отбой — в ту же минуту 👇"]
-    ilya: ["<b>Всю ночь это шло в «{name}» в прямом эфире:</b> тревоги, сбития, районы и отбой 👇"]
+    andrey:
+      - "<b>Всё велось в «{name}»:</b> тревоги, районы, сбития и отбой — в ту же минуту 👇"
+      - "<b>Каждый шаг этой атаки был в «{name}»</b> — с районами и временем 👇"
+      - "<b>Хотите узнавать такое сразу, а не постфактум?</b> Подписывайтесь на «{name}» 👇"
+    ilya:
+      - "<b>Всё это шло в «{name}» в прямом эфире:</b> тревоги, сбития, районы и отбой 👇"
+      - "<b>Подписчики «{name}» знали обо всём в момент объявления</b> 👇"
+      - "<b>Следующую тревогу узнайте первыми</b> — «{name}» 👇"
   link: "👉 <a href=\"https://{link}\">{name}</a>"
 
 vk_story:
   andrey:
-    - "Ночь над {region_ins} затянулась до утра. Опасность по БПЛА объявили в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}Кто-то не спал всю ночь, а кто-то узнаёт обо всём только сейчас.\n\nВ «{name}» тревога и отбой по {city_dat} и области выходят сразу, как их объявляют.\n\nА вы этой ночью спали или следили за обстановкой?\n\n{name} в MAX — https://{link}"
+    - {need: [], text: "{When} над {region_ins} было неспокойно. Опасность по БПЛА объявили в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}Кто-то не спал всю ночь, а кто-то узнаёт обо всём только сейчас.\n\nВ «{name}» тревога и отбой по {city_dat} и области выходят сразу, как их объявляют.\n\nА вы этой ночью спали или следили за обстановкой?\n\n{name} в MAX — https://{link}"}
+    - {need: [places], text: "{When} дроны фиксировали над {region_ins}: {places}. Опасность объявили в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}Обо всём этом в «{name}» писали в ту же минуту — с районами и временем.\n\nКак вы узнали об атаке: по уведомлению или утром из новостей?\n\nКанал в MAX — https://{link}"}
+    - {need: [clear], text: "Отбой в {region_loc} дали в {clear_time}. Тревога началась в {first_time}{shot_sentence}\n\n{airport_sentence}Пока тревога идёт, важна каждая минута — поэтому в «{name}» оповещения выходят сразу.\n\nПодписаться в MAX — https://{link}\n\nВы успели узнать об отбое сразу?"}
   ilya:
-    - "Этой ночью над {region_ins} снова работала ПВО. Первое предупреждение пришло в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}{quote_sentence}Те, кто подписан на радар, узнавали о каждой тревоге сразу, остальные — только утром.\n\n«{name}» в MAX: тревога, сбития и отбой по {city_dat} и области в момент объявления.\n\nВы узнали о тревоге сразу или уже утром?\n\nПодписаться — https://{link}"
+    - {need: [night], text: "Этой ночью над {region_ins} снова работала ПВО. Первое предупреждение пришло в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}{quote_sentence}Те, кто подписан на радар, узнавали о каждой тревоге сразу, остальные — только утром.\n\n«{name}» в MAX: тревога, сбития и отбой по {city_dat} и области в момент объявления.\n\nВы узнали о тревоге сразу или уже утром?\n\nПодписаться — https://{link}"}
+    - {need: [], text: "{When} над {region_ins} объявляли опасность по БПЛА: первое предупреждение пришло в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}Подписчики «{name}» узнавали о каждой тревоге сразу, по уведомлению.\n\nПодписаться в MAX — https://{link}\n\nА вы как узнаёте о тревогах?"}
+    - {need: [quote], text: "«{quote}» — такое уведомление получили в {quote_time} подписчики «{name}».\n\nТревога в {region_loc} началась в {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}Чтобы в следующий раз узнать сразу, а не из утренних новостей, подпишитесь на радар в MAX и включите уведомления: https://{link}\n\nКак у вас прошла эта ночь?"}
+    - {need: [dur], text: "{dur_nom} тревоги в {region_loc}: с {first_time}{shot_sentence}{ongoing_sentence}\n\n{airport_sentence}Всё это время «{name}» присылал каждое предупреждение отдельным уведомлением — по районам, без задержек.\n\nПодписаться в MAX — https://{link}\n\nА вы знали, что тревога длилась так долго?"}
 
 vk_pereliv:
   andrey:
-    - "{quote_lead}{shot_sentence_cap}{airport_sentence}Лента ВКонтакте сама решает, какие записи показать первыми, поэтому срочный пост легко пропустить или увидеть уже утром. В MAX каждая тревога, сбития и отбой приходят отдельным уведомлением на экран телефона — сразу и по порядку, с районами.\n\nЕсли хотите узнавать о тревоге в момент объявления, подпишитесь на «{name}» в MAX и включите уведомления:\n👉 https://{link}\n\nА вы этой ночью узнали о тревоге сразу или уже утром?"
+    - {need: [], text: "{quote_lead}{shot_sentence_cap}{airport_sentence}Лента ВКонтакте сама решает, какие записи показать первыми, поэтому срочный пост легко пропустить или увидеть уже утром. В MAX каждая тревога, сбития и отбой приходят отдельным уведомлением на экран телефона — сразу и по порядку, с районами.\n\nЕсли хотите узнавать о тревоге в момент объявления, подпишитесь на «{name}» в MAX и включите уведомления:\n👉 https://{link}\n\nА вы этой ночью узнали о тревоге сразу или уже утром?"}
+    - {need: [], text: "Тревогу в {region_loc} объявили в {first_time}.{ongoing_sentence} {shot_sentence_cap}\n\n{airport_sentence}Здесь, во ВКонтакте, мы публикуем главное. А каждое оповещение по районам — сразу, как его объявляют, — выходит в нашем канале в MAX.\n\nПодпишитесь и включите уведомления: https://{link}\n\nКак вам удобнее получать тревоги — здесь или в мессенджере?"}
   ilya:
-    - "{quote_lead}{shot_sentence_cap}{airport_sentence}Во ВКонтакте лента сама выбирает, что показать, и срочное сообщение может прийти с опозданием. В MAX «{name}» присылает каждую тревогу, сбития и отбой отдельным уведомлением — в ту же минуту, по районам.\n\nХотите узнавать о тревоге сразу — подпишитесь в MAX и включите уведомления:\n👉 https://{link}\n\nВаш телефон этой ночью предупредил вас вовремя?"
+    - {need: [], text: "{quote_lead}{shot_sentence_cap}{airport_sentence}Во ВКонтакте лента сама выбирает, что показать, и срочное сообщение может прийти с опозданием. В MAX «{name}» присылает каждую тревогу, сбития и отбой отдельным уведомлением — в ту же минуту, по районам.\n\nХотите узнавать о тревоге сразу — подпишитесь в MAX и включите уведомления:\n👉 https://{link}\n\nВаш телефон этой ночью предупредил вас вовремя?"}
+    - {need: [], text: "Первое предупреждение в {region_loc} пришло в {first_time}.{ongoing_sentence} {shot_sentence_cap}\n\n{airport_sentence}В MAX «{name}» работает как будильник: тревога, район, отбой — уведомлением, без ленты и алгоритмов.\n\nПодписаться: https://{link}\n\nВы узнали об этой атаке сразу?"}
