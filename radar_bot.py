@@ -15,6 +15,10 @@ from textproc import (clean_text, classify, card_kind, is_ad, matches_filter, DA
                       region_ok, card_decision, carry_source_photos, complete_alert, alert_from_image, is_place_only, headline,
                       series_key, series_keys, ALL_REGIONS, news_rubric, with_rubric)
 import vkid   # FIX-12: фото новостей — ключом админа (VK ID), иначе ВК не показывает их на стене
+try:  # 27.11 крео-бот: личка боту и лента постов пишутся в файлы (creo_hook), ошибки там глушатся — тревоги не задерживает
+    import creo_hook
+except Exception:
+    creo_hook = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRETS_FILE = os.environ.get("RADAR_SECRETS", "/etc/radar-bot/secrets.json")
@@ -320,6 +324,8 @@ class Bot:
             return self._handle(msg)
         finally:
             self.record_corpus(msg)
+            if creo_hook:
+                creo_hook.record(msg, self.chat_to_source, os.path.dirname(STATE_FILE))
 
     def record_corpus(self, msg):
         """Пост MAX наших каналов -> строка в corpus.jsonl (последние CORPUS_KEEP). Ключей и токенов там нет:

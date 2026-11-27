@@ -1,0 +1,53 @@
+# Крео-бот (27.11): отвечает в личке бота «Радар» людям из users — картинка + текст для закупа и переливов.
+# Факты берёт только из постов наших каналов (лента creo_feed.jsonl), нейросети на сервере нет.
+# Ключей здесь нет. Тексты-шаблоны — creo_templates.yaml.
+enabled: true
+api: "https://platform-api.max.ru"   # тот же адрес, что у radar_bot.py
+feed_hours: 12                        # посты канала за сколько часов берём в крео
+timezone: "Europe/Moscow"
+
+# Кто может пользоваться. id — MAX user_id: человек пишет боту что угодно, бот отвечает «Ваш ID: …».
+# networks — каналы каких сетей ему доступны (andrey, ilya).
+users: []
+#  - {id: 123456789, name: "Никита", networks: [andrey, ilya]}
+
+networks:
+  andrey: "Сеть Андрея"
+  ilya: "Новости в MAX (сеть Ильи)"
+
+# Каналы для крео. link — как в адресе max.ru/…; words — как канал называют в запросе.
+# loc/ins/acc/dat — формы для текста: «в Питере», «над Ленобластью», «на Петербург», «по Петербургу».
+# Бот должен быть админом (без прав) в канале, иначе не видит его постов.
+channels:
+  - {key: spb_andrey, place_acc: "Питер и Ленобласть",  network: andrey, link: "max.ru/novostniknovo", name: "Радар Питер и ЛО", button: "Радар Питер",
+     place: "Питер и Ленобласть", city: "Питер", city_loc: "Петербурге", city_acc: "Петербург", city_dat: "Петербургу",
+     region_ins: "Ленобластью", region_loc: "Ленобласти", airport: "Пулково",
+     words: ["питер", "спб", "петербург", "ленобл", "ленинград"]}
+  - {key: spb_ilya, place_acc: "Питер и Ленобласть",  network: ilya, link: "max.ru/id633034814665_biz", name: "Радар Питер и Ленинградская область",
+     button: "Радар Питер", place: "Питер и Ленобласть", city: "Питер", city_loc: "Петербурге", city_acc: "Петербург",
+     city_dat: "Петербургу", region_ins: "Ленобластью", region_loc: "Ленобласти", airport: "Пулково",
+     words: ["питер", "спб", "петербург", "ленобл", "ленинград"]}
+  - {key: msk_andrey, place_acc: "Москву и Подмосковье",  network: andrey, link: "max.ru/club7247", name: "Радар Москва и МО", button: "Радар Москва",
+     place: "Москва и Подмосковье", city: "Москва", city_loc: "Москве", city_acc: "Москву", city_dat: "Москве",
+     region_ins: "Подмосковьем", region_loc: "Подмосковье", airport: "Шереметьево|Внуково|Домодедово|Жуковский",
+     words: ["москв", "мск", "подмоск"]}
+  - {key: samara_andrey, place_acc: "Самару и область",  network: andrey, link: "max.ru/club7174", name: "Радар Самара", button: "Радар Самара",
+     place: "Самара и область", city: "Самара", city_loc: "Самаре", city_acc: "Самару", city_dat: "Самаре",
+     region_ins: "Самарской областью", region_loc: "Самарской области", airport: "Курумоч",
+     words: ["самар", "тольятт", "сызран"]}
+  - {key: samara_ilya, place_acc: "Самару и область",  network: ilya, link: "max.ru/club5843", name: "Радар Самара", button: "Радар Самара",
+     place: "Самара и область", city: "Самара", city_loc: "Самаре", city_acc: "Самару", city_dat: "Самаре",
+     region_ins: "Самарской областью", region_loc: "Самарской области", airport: "Курумоч",
+     words: ["самар"]}
+  - {key: krasnodar_ilya, place_acc: "Кубань",  network: ilya, link: "max.ru/club7189", name: "Радар Краснодар и край", button: "Радар Краснодар",
+     place: "Кубань", city: "Краснодар", city_loc: "Краснодаре", city_acc: "Краснодар", city_dat: "Краснодару",
+     region_ins: "Кубанью", region_loc: "Краснодарском крае", airport: "Пашковский|Сочи|Анапа|Геленджик",
+     words: ["краснодар", "кубан"]}
+  - {key: ufa_ilya, place_acc: "Башкирию",  network: ilya, link: "max.ru/club7231", name: "Радар Башкортостан", button: "Радар Башкирия",
+     place: "Башкирия", city: "Уфа", city_loc: "Уфе", city_acc: "Уфу", city_dat: "Уфе",
+     region_ins: "Башкирией", region_loc: "Башкирии", airport: "Уфа",
+     words: ["уф", "башк"]}
+  - {key: russia_ilya, place_acc: "Россию",  network: ilya, link: "max.ru/radar_russia_bpla", name: "Радар по всей России", button: "Тревоги по всей России",
+     place: "Россия", city: "Россия", city_loc: "России", city_acc: "Россию", city_dat: "России",
+     region_ins: "регионами России", region_loc: "регионах России", airport: "",
+     words: ["росси", "рф", "всей"]}
