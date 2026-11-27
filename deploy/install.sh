@@ -34,6 +34,17 @@ if [ -f "$DIR/deploy/radar-status.timer" ]; then
     || echo "$(date '+%F %T') бот: таймер статуса не включился"
 fi
 
+# 27.11 крео-бот: свой сервис рядом с ботом тревог (ответы в личке бота). Ошибка здесь бота тревог не останавливает.
+if [ -f "$DIR/deploy/radar-creo.service" ]; then
+  if ! ls /usr/share/fonts/truetype/dejavu/DejaVuSans-ExtraLight.ttf >/dev/null 2>&1 || ! python3 -c "import PIL" 2>/dev/null; then
+    (apt-get install -yq fonts-dejavu-core fonts-dejavu-extra python3-pil >/dev/null 2>&1) \
+      || echo "$(date '+%F %T') бот: шрифты/Pillow для крео-бота не установились"
+  fi
+  { install -m 644 "$DIR/deploy/radar-creo.service" /etc/systemd/system/ && systemctl daemon-reload \
+    && systemctl enable -q radar-creo && systemctl restart radar-creo; } \
+    || echo "$(date '+%F %T') бот: крео-бот не запустился"
+fi
+
 # страница настройки: https://<домен>:8443/<ключ>/ — через nginx, с тем же сертификатом, что у сайта
 SSL=/etc/ssl/novosti-max
 if [ -s "$SSL/fullchain.pem" ] && [ -s "$SSL/key.pem" ]; then

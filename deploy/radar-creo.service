@@ -1,0 +1,19 @@
+[Unit]
+Description=Радар: крео-бот (ответы в личке бота — крео для закупов и переливов)
+After=network-online.target radar-bot.service
+Wants=network-online.target
+
+[Service]
+User=radarbot
+WorkingDirectory=/opt/radar-bot
+ExecStart=/usr/bin/python3 /opt/radar-bot/creo_bot.py
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/radar-bot
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
